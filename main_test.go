@@ -25,7 +25,7 @@ func createTestModel() model {
 		stats:           make(map[int32]*ProcStats),
 		killing:         make(map[int32]bool),
 		killThreshold:   90.0,
-		protected:       map[string]bool{"chrome-remote-desktop": true},
+		protected:       map[string]bool{"chrome-remote-desktop": true, "chrome": true},
 		totalMemHistory: make([]float64, 60),
 	}
 	return m
@@ -228,6 +228,10 @@ func TestTUI_ProtectProcesses(t *testing.T) {
 		t.Errorf("Expected chrome-remote-desktop to be protected by default")
 	}
 
+	// Ensure chrome is protected by default
+	if !m.protected["chrome"] {
+		t.Errorf("Expected chrome to be protected by default")
+	}
 	// Add a mock process
 	m.stats[1234] = &ProcStats{
 		PID:        1234,
