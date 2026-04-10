@@ -26,7 +26,7 @@ When a process meets the kill criteria, the application performs an asynchronous
 Built using `charmbracelet/bubbletea` and `lipgloss`, taking up the full terminal window.
 - **Header:** Displays the application title and current total system memory percentage (color-coded: Green < 80%, Yellow > 80%, Red > 90%).
 - **Top Pane (Process List):** A table displaying PID, Name, Memory (MB), Memory (%), and Rise Rate (MB/s). Sorted descending by total memory.
-- **Bottom-Left Pane (Kill Candidates):** Lists the top 10 processes currently exhibiting sharp memory growth.
+- **Bottom-Left Pane (Kill Candidates):** A numbered list of the top 10 processes currently exhibiting sharp memory growth.
 - **Bottom-Right Pane (Kill History):** A log of recently killed processes, including timestamp, PID, name, and the specific reason/rate.
 - **Help Overlay:** A full-screen, centered overlay displaying keyboard shortcuts, toggled via the `?` key and closed via `esc`.
 
