@@ -1,7 +1,7 @@
 # mkill Specification
 
 ## Overview
-`mkill` is a Terminal User Interface (TUI) application written in Go. Its primary function is to act as a memory watchdog, continuously monitoring the memory utilization of processes owned by the current user and safely terminating rogue processes that exhibit sharp, uncontrolled memory spikes when system memory is critically low.
+`mkill` is a Terminal User Interface (TUI) application written in Go. Its primary function is to act as a memory watchcat, continuously monitoring the memory utilization of processes owned by the current user and safely terminating rogue processes that exhibit sharp, uncontrolled memory spikes when system memory is critically low.
 
 ## Core Logic & Thresholds
 - **Monitoring Scope:** Only processes owned by the current user.
