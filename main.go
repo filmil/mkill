@@ -394,10 +394,11 @@ func main() {
 	t.SetStyles(s)
 
 	m := model{
-		table:         t,
-		stats:         make(map[int32]*ProcStats),
-		killing:       make(map[int32]bool),
-		killThreshold: 90.0,
+		table:           t,
+		stats:           make(map[int32]*ProcStats),
+		killing:         make(map[int32]bool),
+		killThreshold:   90.0,
+		totalMemHistory: make([]float64, 60),
 	}
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
