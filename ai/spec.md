@@ -10,11 +10,9 @@
 - **Spike Detection:** 
   - The program maintains a rolling history of the last 10 memory samples for each process.
   - A process is considered a "sharp riser" (candidate) if its memory growth rate exceeds 0.5 MB/s.
-- **Kill Criteria:** To be terminated, a process must:
-  1. Be the top sharpest riser.
-  2. Have at least 3 historical samples.
-  3. Be currently using >20% more memory than its historical average.
-  4. Be rising at a rate >1.0 MB/s.
+- **Kill Criteria:** To be terminated, a process must simply:
+  1. Be the top sharpest riser (highest growth rate).
+  2. The system total memory must exceed the **90%** threshold.
 
 ## Graceful Termination Procedure
 When a process meets the kill criteria, the application performs an asynchronous kill procedure:

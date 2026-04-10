@@ -202,68 +202,51 @@ func (m *model) checkAndKill() tea.Cmd {
 
 	target := m.candidates[0]
 	
-	// Double check it's not a stable long running process.
-	// We look at the history: if it's been high but stable, don't kill it.
-	// If it's recently spiked significantly above its average history, it's a candidate.
-	if len(target.History) < 3 {
-		return nil // Not enough data yet
+	if m.killing[target.PID] {
+		return nil
 	}
+	m.killing[target.PID] = true
 	
-	sum := 0.0
-	for _, h := range target.History[:len(target.History)-1] {
-		sum += h
-	}
-	avg := sum / float64(len(target.History)-1)
-	
-	// If current memory is 20% higher than average and rising fast
-	if target.MemoryMB > avg*1.2 && target.RiseRate > 1.0 {
-		if m.killing[target.PID] {
-			return nil
-		}
-		m.killing[target.PID] = true
-		
-		pid := target.PID
-		name := target.Name
-		reasonBase := fmt.Sprintf("Spike: %.2f MB/s", target.RiseRate)
+	pid := target.PID
+	name := target.Name
+	reasonBase := fmt.Sprintf("Spike: %.2f MB/s", target.RiseRate)
 
-		return func() tea.Msg {
-			p, err := process.NewProcess(pid)
-			if err != nil {
-				return killMsg{KillEvent{time.Now(), pid, name, "Process not found: " + err.Error()}}
-			}
-			
-			err = p.SendSignal(syscall.SIGTERM)
-			reason := reasonBase
-			if err != nil {
-				p.Kill()
-				reason += " (SIGKILL immediate)"
-			} else {
-				killed := false
-				for i := 0; i < 6; i++ {
-					time.Sleep(500 * time.Millisecond)
-					exists, _ := process.PidExists(pid)
-					if !exists {
-						killed = true
-						break
-					}
-				}
-				if !killed {
-					p.Kill()
-					reason += " (SIGKILL applied)"
-				} else {
-					reason += " (SIGTERM successful)"
-				}
-			}
-			
-			return killMsg{KillEvent{
-				Time:   time.Now(),
-				PID:    pid,
-				Name:   name,
-				Reason: reason,
-			}}
+	return func() tea.Msg {
+		p, err := process.NewProcess(pid)
+		if err != nil {
+			return killMsg{KillEvent{time.Now(), pid, name, "Process not found: " + err.Error()}}
 		}
+		
+		err = p.SendSignal(syscall.SIGTERM)
+		reason := reasonBase
+		if err != nil {
+			p.Kill()
+			reason += " (SIGKILL immediate)"
+		} else {
+			killed := false
+			for i := 0; i < 6; i++ {
+				time.Sleep(500 * time.Millisecond)
+				exists, _ := process.PidExists(pid)
+				if !exists {
+					killed = true
+					break
+				}
+			}
+			if !killed {
+				p.Kill()
+				reason += " (SIGKILL applied)"
+			} else {
+				reason += " (SIGTERM successful)"
+			}
+		}
+		
+		return killMsg{KillEvent{
+			Time:   time.Now(),
+			PID:    pid,
+			Name:   name,
+			Reason: reason,
+		}}
 	}
-	return nil
 }
 
 var (
