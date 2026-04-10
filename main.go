@@ -442,7 +442,7 @@ func main() {
 		killing:         make(map[int32]bool),
 		killThreshold:   90.0,
 		totalMemHistory: make([]float64, 60),
-		protected:       map[string]bool{"chrome-remote-desktop": true},
+		protected:       map[string]bool{"chrome-remote-desktop": true, "chrome": true},
 	}
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
