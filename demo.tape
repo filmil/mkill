@@ -7,18 +7,20 @@ Set MarginFill "#674EFF"
 Set BorderRadius 10
 Set Width 1200
 Set Height 800
-Set TypingSpeed 100ms
+Set TypingSpeed 200ms
 Set Theme "Catppuccin Mocha"
 
 Type "./mkill"
+Sleep 1s
 Enter
 
-Sleep 3s
+Sleep 6s
 
 Type "?"
-Sleep 3s
+Sleep 6s
 
 Type "escape"
-Sleep 3s
+Sleep 6s
 
 Type "q"
+Sleep 2s
