@@ -1,0 +1,15 @@
+/bazel-*
+/bazel-bin
+/bazel-out
+/bazel-testlogs
+/.bazelrc
+
+# Go specific ignores
+/mkill
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out

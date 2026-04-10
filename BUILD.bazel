@@ -1,0 +1,25 @@
+load("@gazelle//:def.bzl", "gazelle")
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+# gazelle:prefix mkill
+gazelle(name = "gazelle")
+
+go_library(
+    name = "mkill_lib",
+    srcs = ["main.go"],
+    importpath = "mkill",
+    visibility = ["//visibility:private"],
+    deps = [
+        "@com_github_charmbracelet_bubbles//table",
+        "@com_github_charmbracelet_bubbletea//:bubbletea",
+        "@com_github_charmbracelet_lipgloss//:lipgloss",
+        "@com_github_shirou_gopsutil_v3//mem",
+        "@com_github_shirou_gopsutil_v3//process",
+    ],
+)
+
+go_binary(
+    name = "mkill",
+    embed = [":mkill_lib"],
+    visibility = ["//visibility:public"],
+)

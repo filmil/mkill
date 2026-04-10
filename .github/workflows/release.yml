@@ -1,0 +1,89 @@
+name: Release
+
+on:
+  schedule:
+    - cron: '0 0 1 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    outputs:
+      new_tag: ${{ steps.tag_version.outputs.new_tag }}
+      changelog: ${{ steps.tag_version.outputs.changelog }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Bump version and push tag
+      id: tag_version
+      uses: mathieudutour/github-tag-action@v6.2
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+
+  build:
+    needs: tag
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - arch: linux_amd64
+            os: linux
+            cpu: amd64
+          - arch: linux_arm64
+            os: linux
+            cpu: arm64
+          - arch: darwin_amd64
+            os: darwin
+            cpu: amd64
+          - arch: darwin_arm64
+            os: darwin
+            cpu: arm64
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Bazelisk
+      uses: bazelbuild/setup-bazelisk@v3
+
+    - name: Cache Bazel
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/bazel-disk-cache
+          ~/.cache/bazel-repository-cache
+        key: ${{ runner.os }}-bazel-${{ matrix.arch }}-${{ hashFiles('MODULE.bazel.lock', 'go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-bazel-${{ matrix.arch }}-
+
+    - name: Build Binary
+      run: |
+        bazel build -c opt --platforms=@rules_go//go/toolchain:${{ matrix.arch }} --disk_cache=~/.cache/bazel-disk-cache --repository_cache=~/.cache/bazel-repository-cache //:mkill
+        cp bazel-bin/mkill_/mkill mkill-${{ matrix.arch }}
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: mkill-${{ matrix.arch }}
+        path: mkill-${{ matrix.arch }}
+
+  release:
+    needs: [tag, build]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ needs.tag.outputs.new_tag }}
+        name: Release ${{ needs.tag.outputs.new_tag }}
+        body: ${{ needs.tag.outputs.changelog }}
+        files: artifacts/**/*
