@@ -52,3 +52,9 @@ When implementing a new feature, you MUST:
 1. Update `ai/spec.md` to reflect the technical specification and core logic of the new feature.
 2. Update `README.md` to include a description of the new feature for users.
 3. Update the screen recording (e.g. `demo.gif` or `demo.tape`) to showcase the new feature if it includes UI changes.
+
+### 5. Formatting Go Code
+To format Go files, you MUST use the Bazel-managed Go toolchain instead of your local `gofmt` executable. This ensures the correct formatting version is used across different environments.
+```bash
+bazel run @rules_go//go -- fmt ARGS
+```
