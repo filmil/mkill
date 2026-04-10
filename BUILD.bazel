@@ -1,5 +1,5 @@
 load("@gazelle//:def.bzl", "gazelle")
-load("@rules_go//go:def.bzl", "go_binary", "go_library")
+load("@rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
 
 # gazelle:prefix mkill
 gazelle(name = "gazelle")
@@ -22,4 +22,10 @@ go_binary(
     name = "mkill",
     embed = [":mkill_lib"],
     visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "mkill_test",
+    srcs = ["main_test.go"],
+    embed = [":mkill_lib"],
 )
