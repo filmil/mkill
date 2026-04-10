@@ -41,17 +41,17 @@ type KillEvent struct {
 }
 
 type model struct {
-	table         table.Model
-	candidates    []*ProcStats
-	killHistory   []KillEvent
-	totalMem      float64
+	table           table.Model
+	candidates      []*ProcStats
+	killHistory     []KillEvent
+	totalMem        float64
 	totalMemHistory []float64
-	currentUser   string
-	stats         map[int32]*ProcStats
-	width, height int
-	showHelp      bool
-	killing       map[int32]bool
-	killThreshold float64
+	currentUser     string
+	stats           map[int32]*ProcStats
+	width, height   int
+	showHelp        bool
+	killing         map[int32]bool
+	killThreshold   float64
 }
 
 type tickMsg time.Time
@@ -74,6 +74,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.showHelp = true
 		case "esc":
 			m.showHelp = false
+		case "=", "+":
+			m.killThreshold += 1.0
+			if m.killThreshold > 100.0 {
+				m.killThreshold = 100.0
+			}
+		case "-":
+			m.killThreshold -= 1.0
+			if m.killThreshold < 0.0 {
+				m.killThreshold = 0.0
+			}
 		}
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -95,7 +105,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		delete(m.killing, msg.event.PID)
 		return m, nil
 	}
-	
+
 	m.table, cmd = m.table.Update(msg)
 	return m, cmd
 }
@@ -199,21 +209,20 @@ func (m *model) updateStats() {
 }
 
 func (m *model) checkAndKill() tea.Cmd {
-	if m.totalMem < killThreshold {
+	if m.totalMem < m.killThreshold {
 		return nil
 	}
-
 	if len(m.candidates) == 0 {
 		return nil
 	}
 
 	target := m.candidates[0]
-	
+
 	if m.killing[target.PID] {
 		return nil
 	}
 	m.killing[target.PID] = true
-	
+
 	pid := target.PID
 	name := target.Name
 	reasonBase := fmt.Sprintf("Spike: %.2f MB/s", target.RiseRate)
@@ -223,7 +232,7 @@ func (m *model) checkAndKill() tea.Cmd {
 		if err != nil {
 			return killMsg{KillEvent{time.Now(), pid, name, "Process not found: " + err.Error()}}
 		}
-		
+
 		err = p.SendSignal(syscall.SIGTERM)
 		reason := reasonBase
 		if err != nil {
@@ -246,7 +255,7 @@ func (m *model) checkAndKill() tea.Cmd {
 				reason += " (SIGTERM successful)"
 			}
 		}
-		
+
 		return killMsg{KillEvent{
 			Time:   time.Now(),
 			PID:    pid,
@@ -306,7 +315,7 @@ func (m model) View() string {
 	if m.totalMem > 90 {
 		memColor = "#FF0000"
 	}
-	
+
 	memStatus := lipgloss.NewStyle().Foreground(lipgloss.Color(memColor)).Render(fmt.Sprintf("Total Memory: %.1f%%", m.totalMem))
 	header := titleStyle.Render("MKILL - Memory Watchdog") + " " + memStatus + " (Threshold: " + fmt.Sprintf("%.1f%%", m.killThreshold) + ")\n"
 
@@ -316,7 +325,9 @@ func (m model) View() string {
 	if len(m.candidates) > 0 {
 		var lines []string
 		for i, c := range m.candidates {
-			if i >= 10 { break }
+			if i >= 10 {
+				break
+			}
 			lines = append(lines, fmt.Sprintf("%d. PID %d (%s): +%.2f MB/s", i+1, c.PID, c.Name, c.RiseRate))
 		}
 		candidateView = strings.Join(lines, "\n")
@@ -333,7 +344,7 @@ func (m model) View() string {
 	}
 
 	bottomHeight := m.height - (m.height / 2) - 6
-	leftPane := baseStyle.Width((m.width-4)/2).Height(bottomHeight).Render(headerStyle.Render("Kill Candidates")+"\n"+candidateView)
+	leftPane := baseStyle.Width((m.width - 4) / 2).Height(bottomHeight).Render(headerStyle.Render("Kill Candidates") + "\n" + candidateView)
 
 	// Build Memory Graph View
 	graphView := "Gathering data..."
