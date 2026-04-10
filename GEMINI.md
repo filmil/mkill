@@ -42,3 +42,9 @@ bazel run //:gazelle
 
 ## Continuous Integration
 The project uses GitHub Actions to automatically run `bazel build //...` and `bazel test //...` on pushes and pull requests to the `main` branch.
+
+## Documentation Maintenance
+
+When implementing a new feature, you MUST:
+1. Update `ai/spec.md` to reflect the technical specification and core logic of the new feature.
+2. Update `README.md` to include a description of the new feature for users.
