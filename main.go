@@ -308,14 +308,12 @@ func (m model) View() string {
 		return m.helpView()
 	}
 
-	memColor := "#00FF00"
-	if m.totalMem > 80 {
-		memColor = "#FFFF00"
+	memColor := "#00FF00" // Green
+	if m.totalMem >= m.killThreshold {
+		memColor = "#FF0000" // Red
+	} else if m.totalMem >= m.killThreshold*0.9 {
+		memColor = "#FFA500" // Orange
 	}
-	if m.totalMem > 90 {
-		memColor = "#FF0000"
-	}
-
 	memStatus := lipgloss.NewStyle().Foreground(lipgloss.Color(memColor)).Render(fmt.Sprintf("Total Memory: %.1f%%", m.totalMem))
 	header := titleStyle.Render("MKILL - Memory Watchdog") + " " + memStatus + " (Threshold: " + fmt.Sprintf("%.1f%%", m.killThreshold) + ")\n"
 
