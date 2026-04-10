@@ -52,8 +52,8 @@ type model struct {
 	showHelp        bool
 	killing         map[int32]bool
 	killThreshold   float64
+	protected       map[string]bool
 }
-
 type tickMsg time.Time
 type killMsg struct{ event KillEvent }
 
@@ -83,6 +83,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.killThreshold -= 1.0
 			if m.killThreshold < 0.0 {
 				m.killThreshold = 0.0
+			}
+		case "p":
+			if row := m.table.SelectedRow(); row != nil {
+				var pid int32
+				fmt.Sscanf(row[0], "%d", &pid)
+				if stat, ok := m.stats[pid]; ok {
+					if m.protected[stat.Name] {
+						delete(m.protected, stat.Name)
+					} else {
+						m.protected[stat.Name] = true
+					}
+					m.updateStats()
+				}
 			}
 		}
 	case tea.WindowSizeMsg:
@@ -186,8 +199,13 @@ func (m *model) updateStats() {
 	})
 
 	for _, s := range sortedStats {
+		pStr := ""
+		if m.protected[s.Name] {
+			pStr = "p"
+		}
 		rows = append(rows, table.Row{
 			fmt.Sprintf("%d", s.PID),
+			pStr,
 			s.Name,
 			fmt.Sprintf("%.1f MB", s.MemoryMB),
 			fmt.Sprintf("%.1f%%", s.MemoryPct),
@@ -199,7 +217,7 @@ func (m *model) updateStats() {
 	// Update candidates
 	m.candidates = nil
 	for _, s := range m.stats {
-		if s.RiseRate > 0.5 { // Only consider processes rising more than 0.5MB/s
+		if s.RiseRate > 0.5 && !m.protected[s.Name] { // Only consider processes rising more than 0.5MB/s and not protected
 			m.candidates = append(m.candidates, s)
 		}
 	}
@@ -342,8 +360,23 @@ func (m model) View() string {
 	}
 
 	bottomHeight := m.height - (m.height / 2) - 6
-	leftPane := baseStyle.Width((m.width - 4) / 2).Height(bottomHeight).Render(headerStyle.Render("Kill Candidates") + "\n" + candidateView)
 
+	leftTopHeight := bottomHeight / 2
+	leftBottomHeight := bottomHeight - leftTopHeight
+	leftTopPane := lipgloss.NewStyle().Height(leftTopHeight).Render(headerStyle.Render("Kill Candidates") + "\n" + candidateView)
+
+	protectedList := "No protected processes."
+	if len(m.protected) > 0 {
+		var pNames []string
+		for name := range m.protected {
+			pNames = append(pNames, name)
+		}
+		sort.Strings(pNames)
+		protectedList = strings.Join(pNames, "\n")
+	}
+	leftBottomPane := lipgloss.NewStyle().Height(leftBottomHeight).Render(headerStyle.Render("Protected Processes") + "\n" + protectedList)
+
+	leftPane := baseStyle.Width((m.width - 4) / 2).Height(bottomHeight).Render(lipgloss.JoinVertical(lipgloss.Left, leftTopPane, leftBottomPane))
 	// Build Memory Graph View
 	graphView := "Gathering data..."
 	if len(m.totalMemHistory) > 0 {
@@ -379,6 +412,7 @@ func (m model) View() string {
 func main() {
 	columns := []table.Column{
 		{Title: "PID", Width: 8},
+		{Title: "P", Width: 3},
 		{Title: "Name", Width: 20},
 		{Title: "Memory", Width: 12},
 		{Title: "Mem%", Width: 8},
@@ -408,8 +442,8 @@ func main() {
 		killing:         make(map[int32]bool),
 		killThreshold:   90.0,
 		totalMemHistory: make([]float64, 60),
+		protected:       map[string]bool{"chrome-remote-desktop": true},
 	}
-
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		log.Fatal(err)
