@@ -28,7 +28,7 @@ Built using `charmbracelet/bubbletea` and `lipgloss`, taking up the full termina
 - **Top Pane (Process List):** A table displaying PID, Name, Memory (MB), Memory (%), and Rise Rate (MB/s). Sorted descending by total memory.
 - **Bottom-Left Pane (Kill Candidates):** A numbered list of the top 10 processes currently exhibiting sharp memory growth.
 - **Bottom-Right Pane (Kill History):** A log of recently killed processes, including timestamp, PID, name, and the specific reason/rate.
-- **Help Overlay:** A full-screen, centered overlay displaying keyboard shortcuts, toggled via the `?` key and closed via `esc`.
+- **Help Overlay:** A full-screen, centered overlay displaying keyboard shortcuts, toggled via the `?` key and closed via `esc`. Also mentions `=` and `-` for adjusting the kill threshold.
 
 ## Build System
 - Written in Go (1.23+).
