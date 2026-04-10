@@ -175,3 +175,43 @@ func TestTUI_CandidatesRendering(t *testing.T) {
 		t.Errorf("Expected rise rate in view")
 	}
 }
+
+func TestTUI_ThresholdControls(t *testing.T) {
+	m := createTestModel()
+	initialThreshold := m.killThreshold
+
+	// Test increase (+)
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'='}})
+	newModel, ok := m2.(model)
+	if !ok {
+		t.Fatalf("Update did not return a main.model")
+	}
+
+	if newModel.killThreshold <= initialThreshold {
+		t.Errorf("Expected killThreshold to increase, got %f (initial %f)", newModel.killThreshold, initialThreshold)
+	}
+
+	// Test decrease (-)
+	m3, _ := newModel.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'-'}})
+	newModel3, _ := m3.(model)
+
+	if newModel3.killThreshold != initialThreshold {
+		t.Errorf("Expected killThreshold to return to initial, got %f", newModel3.killThreshold)
+	}
+
+	// Test min bound (0)
+	mTestMin := createTestModel()
+	mTestMin.killThreshold = 0.5
+	mTestMin2, _ := mTestMin.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'-'}})
+	if mTestMin2.(model).killThreshold < 0.0 {
+		t.Errorf("Expected killThreshold to be bounded at 0.0, got %f", mTestMin2.(model).killThreshold)
+	}
+
+	// Test max bound (100)
+	mTestMax := createTestModel()
+	mTestMax.killThreshold = 99.5
+	mTestMax2, _ := mTestMax.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'='}})
+	if mTestMax2.(model).killThreshold > 100.0 {
+		t.Errorf("Expected killThreshold to be bounded at 100.0, got %f", mTestMax2.(model).killThreshold)
+	}
+}
