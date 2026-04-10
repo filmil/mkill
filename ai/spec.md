@@ -35,7 +35,7 @@ When a process meets the kill criteria, the application performs an asynchronous
 ## User Interface
 Built using `charmbracelet/bubbletea` and `lipgloss`, taking up the full terminal window.
 - **Header:** Displays the application title and current total system memory percentage (color-coded: Green < 80%, Yellow > 80%, Red > 90%).
-- **Top Pane (Process List):** A table displaying PID, Protection status (P), Name, Memory (MB), Memory (%), and Rise Rate (MB/s). Sorted descending by total memory.
+- **Top Pane (Process List):** A table displaying PID, Protection status (P), Name, Age (process lifetime), Memory (MB), Memory (%), and Rise Rate (MB/s). Sorted descending by total memory.
 - **Bottom-Left Pane (Candidates & Protected):** Split into two sections:
   - **Kill Candidates:** A numbered list of the top 10 processes currently exhibiting sharp memory growth.
   - **Protected Processes:** A list of processes currently marked as protected.
