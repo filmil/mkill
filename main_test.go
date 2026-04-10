@@ -1,10 +1,177 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+	"time"
 
-func TestTrivial(t *testing.T) {
-	// A trivial test to ensure the test runner executes successfully.
-	if 1+1 != 2 {
-		t.Error("Math is broken")
+	"github.com/charmbracelet/bubbles/table"
+	tea "github.com/charmbracelet/bubbletea"
+)
+
+func createTestModel() model {
+	columns := []table.Column{
+		{Title: "PID", Width: 8},
+		{Title: "Name", Width: 20},
+		{Title: "Memory", Width: 12},
+		{Title: "Mem%", Width: 8},
+		{Title: "Rise Rate", Width: 15},
+	}
+
+	t := table.New(table.WithColumns(columns))
+	m := model{
+		table:           t,
+		stats:           make(map[int32]*ProcStats),
+		killing:         make(map[int32]bool),
+		killThreshold:   90.0,
+		totalMemHistory: make([]float64, 60),
+	}
+	return m
+}
+
+func TestTUI_HelpViewToggle(t *testing.T) {
+	m := createTestModel()
+	m.width = 100
+	m.height = 100
+
+	// Initial view shouldn't have help
+	view := m.View()
+	if strings.Contains(view, "Keyboard Shortcuts:") {
+		t.Errorf("Expected normal view, but help text was present")
+	}
+
+	// Press '?'
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
+	newModel, ok := m2.(model)
+	if !ok {
+		t.Fatalf("Update did not return a main.model")
+	}
+
+	if !newModel.showHelp {
+		t.Errorf("Expected showHelp to be true after pressing '?'")
+	}
+
+	// Now view should contain help
+	helpView := newModel.View()
+	if !strings.Contains(helpView, "Keyboard Shortcuts:") {
+		t.Errorf("Expected help view, but help text was missing")
+	}
+
+	// Press 'esc'
+	m3, _ := newModel.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	newModel3, _ := m3.(model)
+
+	if newModel3.showHelp {
+		t.Errorf("Expected showHelp to be false after pressing 'esc'")
+	}
+}
+
+func TestTUI_Quit(t *testing.T) {
+	m := createTestModel()
+
+	m2, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+	if cmd == nil {
+		t.Fatalf("Expected quit command, got nil")
+	}
+
+	// It's hard to compare commands directly, but we know it's a Quit command
+	// Let's just ensure we return tea.Quit (by running it and checking the msg type)
+	msg := cmd()
+	if _, ok := msg.(tea.QuitMsg); !ok {
+		t.Errorf("Expected tea.QuitMsg, got %T", msg)
+	}
+
+	// Check ctrl+c as well
+	_, cmd = m2.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
+	msg = cmd()
+	if _, ok := msg.(tea.QuitMsg); !ok {
+		t.Errorf("Expected tea.QuitMsg for ctrl+c, got %T", msg)
+	}
+}
+
+func TestTUI_WindowResize(t *testing.T) {
+	m := createTestModel()
+
+	newWidth, newHeight := 120, 40
+	m2, _ := m.Update(tea.WindowSizeMsg{Width: newWidth, Height: newHeight})
+	newModel := m2.(model)
+
+	if newModel.width != newWidth {
+		t.Errorf("Expected width %d, got %d", newWidth, newModel.width)
+	}
+	if newModel.height != newHeight {
+		t.Errorf("Expected height %d, got %d", newHeight, newModel.height)
+	}
+}
+
+func TestTUI_TickUpdateStats(t *testing.T) {
+	m := createTestModel()
+	m.width = 100
+	m.height = 100
+
+	// Send a tick message
+	m2, _ := m.Update(tickMsg(time.Now()))
+	newModel := m2.(model)
+
+	// tickMsg triggers updateStats(). It should populate stats.
+	if len(newModel.totalMemHistory) == 0 {
+		t.Errorf("Expected totalMemHistory to be updated")
+	}
+
+	// The view should render without panicking after a tick
+	view := newModel.View()
+	if !strings.Contains(view, "MKILL") {
+		t.Errorf("Expected MKILL in view after tick")
+	}
+}
+
+func TestTUI_KillMessage(t *testing.T) {
+	m := createTestModel()
+	m.width = 100
+	m.height = 100
+
+	pidToKill := int32(1234)
+	m.killing[pidToKill] = true
+
+	killEvent := KillEvent{
+		Time:   time.Now(),
+		PID:    pidToKill,
+		Name:   "test-proc",
+		Reason: "testing",
+	}
+
+	m2, _ := m.Update(killMsg{event: killEvent})
+	newModel := m2.(model)
+
+	if len(newModel.killHistory) != 1 {
+		t.Fatalf("Expected kill history length 1, got %d", len(newModel.killHistory))
+	}
+	if newModel.killHistory[0].PID != pidToKill {
+		t.Errorf("Expected PID %d in kill history, got %d", pidToKill, newModel.killHistory[0].PID)
+	}
+	if newModel.killing[pidToKill] {
+		t.Errorf("Expected PID %d to be removed from killing map", pidToKill)
+	}
+}
+
+func TestTUI_CandidatesRendering(t *testing.T) {
+	m := createTestModel()
+	m.width = 100
+	m.height = 100
+
+	m.candidates = []*ProcStats{
+		{
+			PID:      9999,
+			Name:     "memory-hog",
+			RiseRate: 5.5,
+		},
+	}
+
+	view := m.View()
+	if !strings.Contains(view, "memory-hog") {
+		t.Errorf("Expected candidate name in view")
+	}
+	if !strings.Contains(view, "5.50 MB/s") {
+		t.Errorf("Expected rise rate in view")
 	}
 }
