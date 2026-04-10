@@ -310,7 +310,7 @@ func (m model) View() string {
 		var lines []string
 		for i, c := range m.candidates {
 			if i >= 10 { break }
-			lines = append(lines, fmt.Sprintf("• PID %d (%s): +%.2f MB/s", c.PID, c.Name, c.RiseRate))
+			lines = append(lines, fmt.Sprintf("%d. PID %d (%s): +%.2f MB/s", i+1, c.PID, c.Name, c.RiseRate))
 		}
 		candidateView = strings.Join(lines, "\n")
 	}
