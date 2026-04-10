@@ -25,9 +25,8 @@ func createTestModel() model {
 		stats:           make(map[int32]*ProcStats),
 		killing:         make(map[int32]bool),
 		killThreshold:   90.0,
-		protected:       map[string]bool{"chrome-remote-desktop": true, "chrome": true},
-		totalMemHistory: make([]float64, 60),
-	}
+		protected:       map[string]bool{"chrome-remote-desktop": true, "chrome-remote-desktop-host": true, "chrome": true},
+		totalMemHistory: make([]float64, 60)}
 	return m
 }
 
@@ -277,5 +276,34 @@ func TestTUI_ProtectProcesses(t *testing.T) {
 		if c.Name == "test-process" {
 			t.Errorf("Expected test-process to be excluded from candidates due to being protected")
 		}
+	}
+}
+
+func TestTUI_ConfigLoadAndSave(t *testing.T) {
+	tempDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tempDir)
+
+	// Ensure default loads correctly when file doesn't exist
+	loaded := loadConfig()
+	if !loaded["chrome-remote-desktop-host"] {
+		t.Errorf("Expected chrome-remote-desktop-host to be loaded from default config")
+	}
+
+	// Make changes and save via keypress
+	m := createTestModel()
+	m.protected["test-json-custom"] = true
+
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'P'}})
+	_ = m2.(model)
+
+	// Load config again from disk
+	loaded2 := loadConfig()
+	if !loaded2["test-json-custom"] {
+		t.Errorf("Expected test-json-custom to be saved and loaded from JSON config")
+	}
+
+	// chrome-remote-desktop-host should also still be there if we started from createTestModel defaults
+	if !loaded2["chrome-remote-desktop-host"] {
+		t.Errorf("Expected chrome-remote-desktop-host to be saved and loaded from JSON config")
 	}
 }
