@@ -39,7 +39,7 @@ Built using `charmbracelet/bubbletea` and `lipgloss`, taking up the full termina
 - **Bottom-Left Pane (Candidates & Protected):** Split into two sections:
   - **Kill Candidates:** A numbered list of the top 10 processes currently exhibiting sharp memory growth.
   - **Protected Processes:** A list of processes currently marked as protected.
-- **Bottom-Right Pane (Kill History & Memory Graph):** The top half logs recently killed processes (timestamp, PID, name, rate). The bottom half displays a real-time ASCII graph of the system's total memory occupancy (%).
+- **Bottom-Right Pane (Kill History & Memory Graph):** The top half logs recently killed processes (timestamp, PID, name, rate). The list automatically hides older entries off the bottom to ensure the pane fits exactly within the terminal window. The bottom half displays a real-time ASCII graph of the system's total memory occupancy (%).
 - **Help Overlay:** A full-screen, centered overlay displaying keyboard shortcuts, toggled via the `?` key and closed via `esc`. Also mentions `=` and `-` for adjusting the kill threshold, and `p`/`P` for protection.
 
 ## Build System
