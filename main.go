@@ -103,6 +103,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *model) updateStats() {
 	v, _ := mem.VirtualMemory()
 	m.totalMem = v.UsedPercent
+	m.totalMemHistory = append(m.totalMemHistory, v.UsedPercent)
+	if len(m.totalMemHistory) > 60 { // Keep last 60 points for the graph
+		m.totalMemHistory = m.totalMemHistory[len(m.totalMemHistory)-60:]
+	}
 
 	procs, _ := process.Processes()
 	u, _ := user.Current()
