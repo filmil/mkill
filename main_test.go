@@ -14,6 +14,7 @@ func createTestModel() model {
 		{Title: "PID", Width: 8},
 		{Title: "P", Width: 3},
 		{Title: "Name", Width: 20},
+		{Title: "Age", Width: 10},
 		{Title: "Memory", Width: 12},
 		{Title: "Mem%", Width: 8},
 		{Title: "Rise Rate", Width: 15},
@@ -243,7 +244,7 @@ func TestTUI_ProtectProcesses(t *testing.T) {
 
 	// Set rows for selection
 	rows := []table.Row{
-		{"1234", "", "test-process", "100.0 MB", "10.0%", "10.00 MB/s"},
+		{"1234", "", "test-process", "1m0s", "100.0 MB", "10.0%", "10.00 MB/s"},
 	}
 	m.table.SetRows(rows)
 	m.table.SetCursor(0)
@@ -331,7 +332,7 @@ func TestTUI_ManualKillConfirmation(t *testing.T) {
 
 	// Set rows for selection
 	rows := []table.Row{
-		{"1234", "", "test-process", "100.0 MB", "10.0%", "10.00 MB/s"},
+		{"1234", "", "test-process", "1m0s", "100.0 MB", "10.0%", "10.00 MB/s"},
 	}
 	m.table.SetRows(rows)
 	m.table.SetCursor(0)

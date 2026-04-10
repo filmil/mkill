@@ -34,6 +34,7 @@ type ProcStats struct {
 	RiseRate   float64 // MB per second
 	History    []float64
 	LastUpdate time.Time
+	StartTime  time.Time
 }
 
 type KillEvent struct {
@@ -186,6 +187,14 @@ func (m *model) updateStats() {
 		memMB := float64(memInfo.RSS) / 1024 / 1024
 		memPct, _ := p.MemoryPercent()
 
+		createTimeMs, err := p.CreateTime()
+		var startTime time.Time
+		if err == nil {
+			startTime = time.UnixMilli(createTimeMs)
+		} else {
+			startTime = time.Now()
+		}
+
 		stat, ok := m.stats[pid]
 		if !ok {
 			stat = &ProcStats{
@@ -193,6 +202,7 @@ func (m *model) updateStats() {
 				Name:       name,
 				LastUpdate: time.Now(),
 				History:    []float64{memMB},
+				StartTime:  startTime,
 			}
 			m.stats[pid] = stat
 		} else {
@@ -235,10 +245,15 @@ func (m *model) updateStats() {
 		if m.protected[s.Name] {
 			pStr = "p"
 		}
+
+		age := time.Since(s.StartTime).Round(time.Second)
+		ageStr := age.String()
+
 		rows = append(rows, table.Row{
 			fmt.Sprintf("%d", s.PID),
 			pStr,
 			s.Name,
+			ageStr,
 			fmt.Sprintf("%.1f MB", s.MemoryMB),
 			fmt.Sprintf("%.1f%%", s.MemoryPct),
 			fmt.Sprintf("%.2f MB/s", s.RiseRate),
@@ -470,6 +485,7 @@ func main() {
 		{Title: "PID", Width: 8},
 		{Title: "P", Width: 3},
 		{Title: "Name", Width: 20},
+		{Title: "Age", Width: 10},
 		{Title: "Memory", Width: 12},
 		{Title: "Mem%", Width: 8},
 		{Title: "Rise Rate", Width: 15},
