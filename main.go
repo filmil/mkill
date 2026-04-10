@@ -1,9 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"os/user"
+	"path/filepath"
 	"sort"
 	"strings"
 	"syscall"
@@ -97,6 +100,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.updateStats()
 				}
 			}
+		case "P":
+			_ = saveConfig(m.protected)
 		}
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -441,10 +446,65 @@ func main() {
 		killing:         make(map[int32]bool),
 		killThreshold:   90.0,
 		totalMemHistory: make([]float64, 60),
-		protected:       map[string]bool{"chrome-remote-desktop": true, "chrome": true},
+		protected:       loadConfig(),
 	}
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		log.Fatal(err)
 	}
+}
+func getConfigPath() (string, error) {
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(configDir, "mkill", "config.json"), nil
+}
+
+func loadConfig() map[string]bool {
+	defaultProtected := map[string]bool{
+		"chrome-remote-desktop":      true,
+		"chrome-remote-desktop-host": true,
+		"chrome":                     true,
+	}
+	path, err := getConfigPath()
+	if err != nil {
+		return defaultProtected
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return defaultProtected
+	}
+	var cfg struct {
+		Protected []string `json:"protected"`
+	}
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return defaultProtected
+	}
+	protected := make(map[string]bool)
+	for _, p := range cfg.Protected {
+		protected[p] = true
+	}
+	return protected
+}
+
+func saveConfig(protected map[string]bool) error {
+	path, err := getConfigPath()
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
+	var cfg struct {
+		Protected []string `json:"protected"`
+	}
+	for p := range protected {
+		cfg.Protected = append(cfg.Protected, p)
+	}
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0644)
 }
