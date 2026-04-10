@@ -5,6 +5,8 @@
 
 `mkill` is a Go program that continuously monitors memory usage of the programs owned by the current user. It kills the program with the sharpest rise in memory utilization when the overall system memory occupancy goes beyond 90%.
 
+![mkill demo](demo.gif)
+
 The program keeps a running history of memory use to ensure that it does not kill long-running stable programs. It uses the `bubbletea` library to create a top-like TUI (Terminal User Interface) widget which displays processes by memory use, taking the entire size of the terminal and refreshing every few seconds. It also features a pane which shows kill candidates and another which shows which processes have been killed and why.
 
 ## Features
