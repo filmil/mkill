@@ -305,17 +305,19 @@ var (
 )
 
 func (m model) helpView() string {
-        helpText := "MKILL - Help\n\n" +
-                "Keyboard Shortcuts:\n" +
-                "  q, ctrl+c   Quit application\n" +
-                "  ?           Show this help panel\n" +
-                "  esc         Close help panel\n" +
-                "  up/down     Navigate process list\n" +
-                "  +, =        Increase memory kill threshold\n" +
-                "  -           Decrease memory kill threshold\n" +
-                "  p           Toggle 'protect' status of selected process\n" +
-                "  P           Save protected processes to config\n\n" +
-                "Press 'esc' to return to the main view."
+	helpText := "MKILL - Help\n\n" +
+		"Keyboard Shortcuts:\n" +
+		"  q, ctrl+c   Quit application\n" +
+		"  ?           Show this help panel\n" +
+		"  esc         Close help panel\n" +
+		"  up/down, j/k Navigate process list\n" +
+		"  pgup/pgdn   Page up/down process list\n" +
+		"  home/end, g/G Go to top/bottom of list\n" +
+		"  +, =        Increase memory kill threshold\n" +
+		"  -           Decrease memory kill threshold\n" +
+		"  p           Toggle 'protect' status of selected process\n" +
+		"  P           Save protected processes to config\n\n" +
+		"Press 'esc' to return to the main view."
 	box := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("62")).
