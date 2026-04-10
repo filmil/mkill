@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/guptarohit/asciigraph"
 	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/shirou/gopsutil/v3/process"
 )
@@ -44,6 +45,7 @@ type model struct {
 	candidates    []*ProcStats
 	killHistory   []KillEvent
 	totalMem      float64
+	totalMemHistory []float64
 	currentUser   string
 	stats         map[int32]*ProcStats
 	width, height int
@@ -328,7 +330,31 @@ func (m model) View() string {
 
 	bottomHeight := m.height - (m.height / 2) - 6
 	leftPane := baseStyle.Width((m.width-4)/2).Height(bottomHeight).Render(headerStyle.Render("Kill Candidates")+"\n"+candidateView)
-	rightPane := baseStyle.Width((m.width-4)/2).Height(bottomHeight).Render(headerStyle.Render("Kill History")+"\n"+historyView)
+
+	// Build Memory Graph View
+	graphView := "Gathering data..."
+	if len(m.totalMemHistory) > 0 {
+		// Calculate available width and height for graph
+		graphWidth := (m.width-4)/2 - 10
+		if graphWidth < 10 {
+			graphWidth = 10
+		}
+		graphHeight := bottomHeight/2 - 2
+		if graphHeight < 3 {
+			graphHeight = 3
+		}
+
+		graph := asciigraph.Plot(m.totalMemHistory, asciigraph.Height(graphHeight), asciigraph.Width(graphWidth))
+		graphView = graph
+	}
+
+	rightTopHeight := bottomHeight / 2
+	rightBottomHeight := bottomHeight - rightTopHeight
+
+	rightTopPane := lipgloss.NewStyle().Height(rightTopHeight).Render(headerStyle.Render("Kill History") + "\n" + historyView)
+	rightBottomPane := lipgloss.NewStyle().Height(rightBottomHeight).Render(headerStyle.Render("System Memory Occupancy (%)") + "\n" + graphView)
+
+	rightPane := baseStyle.Width((m.width - 4) / 2).Height(bottomHeight).Render(lipgloss.JoinVertical(lipgloss.Left, rightTopPane, rightBottomPane))
 
 	bottomPane := lipgloss.JoinHorizontal(lipgloss.Top, leftPane, rightPane)
 

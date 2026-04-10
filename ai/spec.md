@@ -27,7 +27,7 @@ Built using `charmbracelet/bubbletea` and `lipgloss`, taking up the full termina
 - **Header:** Displays the application title and current total system memory percentage (color-coded: Green < 80%, Yellow > 80%, Red > 90%).
 - **Top Pane (Process List):** A table displaying PID, Name, Memory (MB), Memory (%), and Rise Rate (MB/s). Sorted descending by total memory.
 - **Bottom-Left Pane (Kill Candidates):** A numbered list of the top 10 processes currently exhibiting sharp memory growth.
-- **Bottom-Right Pane (Kill History):** A log of recently killed processes, including timestamp, PID, name, and the specific reason/rate.
+- **Bottom-Right Pane (Kill History & Memory Graph):** The top half logs recently killed processes (timestamp, PID, name, rate). The bottom half displays a real-time ASCII graph of the system's total memory occupancy (%).
 - **Help Overlay:** A full-screen, centered overlay displaying keyboard shortcuts, toggled via the `?` key and closed via `esc`. Also mentions `=` and `-` for adjusting the kill threshold.
 
 ## Build System

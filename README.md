@@ -14,7 +14,7 @@ The program keeps a running history of memory use to ensure that it does not kil
 - **Continuous Monitoring**: Scans all processes owned by the current user every 2 seconds.
 - **Smart Killing**: Only triggers when system memory exceeds 90%. Identifies "sharp risers" by calculating the rate of memory growth (MB/s) and comparing current usage against a history of the last 10 samples.
 - **Graceful Termination**: Sends `SIGTERM` first, waits up to 3 seconds, and if the process hasn't exited, sends `SIGKILL`.
-- **Interactive TUI**: Top pane for process list, bottom panes for a numbered list of kill candidates and kill history.
+- **Interactive TUI**: Top pane for process list, bottom-left pane for a numbered list of kill candidates. The bottom-right pane is split between kill history and a real-time ASCII graph of system memory occupancy.
 - **Adjustable Threshold**: Press `=` to increase or `-` to decrease the kill threshold interactively.
 - **Help Panel**: Press `?` to toggle a help screen overlay.
 
