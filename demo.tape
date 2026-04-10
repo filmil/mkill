@@ -32,6 +32,12 @@ Sleep 2s
 Type "p"
 Sleep 2s
 
+# Show manual kill
+Type "k"
+Sleep 2s
+Type "escape"
+Sleep 2s
+
 # Show saving
 Type "P"
 Sleep 2s

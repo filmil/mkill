@@ -53,6 +53,8 @@ type model struct {
 	stats           map[int32]*ProcStats
 	width, height   int
 	showHelp        bool
+	confirmKillPID  int32
+	confirmKillName string
 	killing         map[int32]bool
 	killThreshold   float64
 	protected       map[string]bool
@@ -100,8 +102,33 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.updateStats()
 				}
 			}
+		case "k":
+			if m.confirmKillPID != 0 {
+				// Confirm kill
+				cmd = killProcessCmd(m.confirmKillPID, m.confirmKillName, "Manual kill")
+				m.killing[m.confirmKillPID] = true
+				m.confirmKillPID = 0
+				m.confirmKillName = ""
+				return m, cmd
+			} else {
+				// Initiate kill confirmation
+				if row := m.table.SelectedRow(); row != nil {
+					var pid int32
+					fmt.Sscanf(row[0], "%d", &pid)
+					if stat, ok := m.stats[pid]; ok {
+						m.confirmKillPID = pid
+						m.confirmKillName = stat.Name
+					}
+				}
+			}
 		case "P":
 			_ = saveConfig(m.protected)
+		}
+
+		if m.confirmKillPID != 0 && msg.String() != "k" {
+			// Any other key cancels the confirmation
+			m.confirmKillPID = 0
+			m.confirmKillName = ""
 		}
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -246,10 +273,11 @@ func (m *model) checkAndKill() tea.Cmd {
 	}
 	m.killing[target.PID] = true
 
-	pid := target.PID
-	name := target.Name
 	reasonBase := fmt.Sprintf("Spike: %.2f MB/s", target.RiseRate)
+	return killProcessCmd(target.PID, target.Name, reasonBase)
+}
 
+func killProcessCmd(pid int32, name string, reasonBase string) tea.Cmd {
 	return func() tea.Msg {
 		p, err := process.NewProcess(pid)
 		if err != nil {
@@ -316,6 +344,7 @@ func (m model) helpView() string {
 		"  +, =        Increase memory kill threshold\n" +
 		"  -           Decrease memory kill threshold\n" +
 		"  p           Toggle 'protect' status of selected process\n" +
+		"  k           Kill highlighted process (requires confirmation)\n" +
 		"  P           Save protected processes to config\n\n" +
 		"Press 'esc' to return to the main view."
 	box := lipgloss.NewStyle().
@@ -334,6 +363,16 @@ func (m model) View() string {
 
 	if m.showHelp {
 		return m.helpView()
+	}
+
+	if m.confirmKillPID != 0 {
+		confirmText := fmt.Sprintf("Are you sure you want to kill process %d (%s)?\n\nPress 'k' to confirm or any other key to cancel.", m.confirmKillPID, m.confirmKillName)
+		box := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("9")).
+			Padding(1, 4).
+			Render(confirmText)
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
 	}
 
 	memColor := "#00FF00" // Green
