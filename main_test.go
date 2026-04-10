@@ -307,3 +307,10 @@ func TestTUI_ConfigLoadAndSave(t *testing.T) {
 		t.Errorf("Expected chrome-remote-desktop-host to be saved and loaded from JSON config")
 	}
 }
+
+func TestTUI_ProtectChromeRemoteDesktopHost(t *testing.T) {
+	m := createTestModel()
+	if !m.protected["chrome-remote-desktop-host"] {
+		t.Errorf("Expected chrome-remote-desktop-host to be protected by default")
+	}
+}
