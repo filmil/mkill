@@ -385,6 +385,12 @@ func (m model) View() string {
 	header := titleStyle.Render("MKILL - Memory Watchcat") + " " + memStatus + " (Threshold: " + fmt.Sprintf("%.1f%%", m.killThreshold) + ")\n"
 	topPane := baseStyle.Width(m.width - 2).Render(m.table.View())
 
+	bottomHeight := m.height - (m.height / 2) - 6
+	leftTopHeight := bottomHeight / 2
+	leftBottomHeight := bottomHeight - leftTopHeight
+	rightTopHeight := bottomHeight / 2
+	rightBottomHeight := bottomHeight - rightTopHeight
+
 	candidateView := "No sharp risers detected."
 	if len(m.candidates) > 0 {
 		var lines []string
@@ -402,15 +408,20 @@ func (m model) View() string {
 		var lines []string
 		for i := len(m.killHistory) - 1; i >= 0; i-- {
 			h := m.killHistory[i]
-			lines = append(lines, fmt.Sprintf("[%s] %s (%d)\n  └ %s", h.Time.Format("15:04:05"), h.Name, h.PID, h.Reason))
+			lines = append(lines, fmt.Sprintf("[%s] %s (%d)", h.Time.Format("15:04:05"), h.Name, h.PID))
+			lines = append(lines, fmt.Sprintf("  └ %s", h.Reason))
+		}
+
+		maxLines := rightTopHeight - 3 // header takes 3 lines
+		if maxLines < 0 {
+			maxLines = 0
+		}
+		if len(lines) > maxLines {
+			lines = lines[:maxLines]
 		}
 		historyView = strings.Join(lines, "\n")
 	}
 
-	bottomHeight := m.height - (m.height / 2) - 6
-
-	leftTopHeight := bottomHeight / 2
-	leftBottomHeight := bottomHeight - leftTopHeight
 	leftTopPane := lipgloss.NewStyle().Height(leftTopHeight).Render(headerStyle.Render("Kill Candidates") + "\n" + candidateView)
 
 	protectedList := "No protected processes."
@@ -441,9 +452,6 @@ func (m model) View() string {
 		graph := asciigraph.Plot(m.totalMemHistory, asciigraph.Height(graphHeight), asciigraph.Width(graphWidth))
 		graphView = graph
 	}
-
-	rightTopHeight := bottomHeight / 2
-	rightBottomHeight := bottomHeight - rightTopHeight
 
 	rightTopPane := lipgloss.NewStyle().Height(rightTopHeight).Render(headerStyle.Render("Kill History") + "\n" + historyView)
 	rightBottomPane := lipgloss.NewStyle().Height(rightBottomHeight).Render(headerStyle.Render("System Memory Occupancy (%)") + "\n" + graphView)
