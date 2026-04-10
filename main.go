@@ -15,6 +15,7 @@ import (
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/guptarohit/asciigraph"
 	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/shirou/gopsutil/v3/process"
@@ -368,7 +369,32 @@ func (m model) helpView() string {
 		Padding(1, 4).
 		Render(helpText)
 
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
+	return box
+}
+
+
+func placeOverlay(x, y int, fg, bg string) string {
+	fgLines := strings.Split(fg, "\n")
+	bgLines := strings.Split(bg, "\n")
+	fgHeight := len(fgLines)
+
+	for i := 0; i < fgHeight; i++ {
+		bgY := y + i
+		if bgY < 0 || bgY >= len(bgLines) {
+			continue
+		}
+
+		bgLine := bgLines[bgY]
+		fgLine := fgLines[i]
+		fgWidth := lipgloss.Width(fgLine)
+
+		leftPart := ansi.Truncate(bgLine, x, "")
+		rightPart := ansi.Cut(bgLine, x+fgWidth, 9999)
+
+		bgLines[bgY] = leftPart + fgLine + rightPart
+	}
+
+	return strings.Join(bgLines, "\n")
 }
 
 func (m model) View() string {
@@ -376,18 +402,16 @@ func (m model) View() string {
 		return "Initializing..."
 	}
 
+	var modalBox string
 	if m.showHelp {
-		return m.helpView()
-	}
-
-	if m.confirmKillPID != 0 {
+		modalBox = m.helpView()
+	} else if m.confirmKillPID != 0 {
 		confirmText := fmt.Sprintf("Are you sure you want to kill process %d (%s)?\n\nPress 'k' to confirm or any other key to cancel.", m.confirmKillPID, m.confirmKillName)
-		box := lipgloss.NewStyle().
+		modalBox = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("9")).
+			BorderForeground(lipgloss.Color("9") ).
 			Padding(1, 4).
 			Render(confirmText)
-		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
 	}
 
 	memColor := "#00FF00" // Green
@@ -477,7 +501,17 @@ func (m model) View() string {
 
 	footer := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Render(" Press '?' for help • 'q' to quit • Refresh: " + refreshInterval.String())
 
-	return lipgloss.JoinVertical(lipgloss.Left, header, topPane, bottomPane, footer)
+	mainView := lipgloss.JoinVertical(lipgloss.Left, header, topPane, bottomPane, footer)
+	if modalBox != "" {
+		modalWidth := lipgloss.Width(modalBox)
+		modalHeight := lipgloss.Height(modalBox)
+		x := (m.width - modalWidth) / 2
+		y := (m.height - modalHeight) / 2
+		if x < 0 { x = 0 }
+		if y < 0 { y = 0 }
+		return placeOverlay(x, y, modalBox, mainView)
+	}
+	return mainView
 }
 
 func main() {
