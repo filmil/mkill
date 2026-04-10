@@ -40,15 +40,16 @@ type KillEvent struct {
 }
 
 type model struct {
-	table        table.Model
-	candidates   []*ProcStats
-	killHistory  []KillEvent
-	totalMem     float64
-	currentUser  string
-	stats        map[int32]*ProcStats
+	table         table.Model
+	candidates    []*ProcStats
+	killHistory   []KillEvent
+	totalMem      float64
+	currentUser   string
+	stats         map[int32]*ProcStats
 	width, height int
-	showHelp     bool
-	killing      map[int32]bool
+	showHelp      bool
+	killing       map[int32]bool
+	killThreshold float64
 }
 
 type tickMsg time.Time
@@ -301,7 +302,7 @@ func (m model) View() string {
 	}
 	
 	memStatus := lipgloss.NewStyle().Foreground(lipgloss.Color(memColor)).Render(fmt.Sprintf("Total Memory: %.1f%%", m.totalMem))
-	header := titleStyle.Render("MKILL - Memory Watchdog") + " " + memStatus + " (Threshold: " + fmt.Sprintf("%.1f%%", killThreshold) + ")\n"
+	header := titleStyle.Render("MKILL - Memory Watchdog") + " " + memStatus + " (Threshold: " + fmt.Sprintf("%.1f%%", m.killThreshold) + ")\n"
 
 	topPane := baseStyle.Width(m.width - 2).Render(m.table.View())
 
@@ -363,9 +364,10 @@ func main() {
 	t.SetStyles(s)
 
 	m := model{
-		table: t,
-		stats: make(map[int32]*ProcStats),
-		killing: make(map[int32]bool),
+		table:         t,
+		stats:         make(map[int32]*ProcStats),
+		killing:       make(map[int32]bool),
+		killThreshold: 90.0,
 	}
 
 	p := tea.NewProgram(m, tea.WithAltScreen())

@@ -20,7 +20,14 @@ Type "?"
 Sleep 6s
 
 Type "escape"
-Sleep 6s
+Sleep 2s
+
+Type "-"
+Sleep 1s
+Type "-"
+Sleep 1s
+Type "="
+Sleep 2s
 
 Type "q"
 Sleep 2s
