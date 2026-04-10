@@ -45,6 +45,7 @@ The project uses GitHub Actions to automatically run `bazel build //...` and `ba
 
 ## PR Validation
 Before completing a feature or creating a PR, you MUST ensure that the build and tests always pass. You must fix any build or test errors before considering the task complete.
+Each new feature MUST be accompanied by tests that cover the feature code paths.
 
 ## Documentation Maintenance
 
