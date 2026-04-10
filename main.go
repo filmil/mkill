@@ -333,8 +333,7 @@ func (m model) View() string {
 		memColor = "#FFA500" // Orange
 	}
 	memStatus := lipgloss.NewStyle().Foreground(lipgloss.Color(memColor)).Render(fmt.Sprintf("Total Memory: %.1f%%", m.totalMem))
-	header := titleStyle.Render("MKILL - Memory Watchdog") + " " + memStatus + " (Threshold: " + fmt.Sprintf("%.1f%%", m.killThreshold) + ")\n"
-
+	header := titleStyle.Render("MKILL - Memory Watchcat") + " " + memStatus + " (Threshold: " + fmt.Sprintf("%.1f%%", m.killThreshold) + ")\n"
 	topPane := baseStyle.Width(m.width - 2).Render(m.table.View())
 
 	candidateView := "No sharp risers detected."
