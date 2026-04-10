@@ -43,6 +43,9 @@ bazel run //:gazelle
 ## Continuous Integration
 The project uses GitHub Actions to automatically run `bazel build //...` and `bazel test //...` on pushes and pull requests to the `main` branch.
 
+## PR Validation
+Before completing a feature or creating a PR, you MUST ensure that the build and tests always pass. You must fix any build or test errors before considering the task complete.
+
 ## Documentation Maintenance
 
 When implementing a new feature, you MUST:
