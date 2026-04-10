@@ -12,6 +12,7 @@ import (
 func createTestModel() model {
 	columns := []table.Column{
 		{Title: "PID", Width: 8},
+		{Title: "P", Width: 3},
 		{Title: "Name", Width: 20},
 		{Title: "Memory", Width: 12},
 		{Title: "Mem%", Width: 8},
@@ -24,6 +25,7 @@ func createTestModel() model {
 		stats:           make(map[int32]*ProcStats),
 		killing:         make(map[int32]bool),
 		killThreshold:   90.0,
+		protected:       map[string]bool{"chrome-remote-desktop": true},
 		totalMemHistory: make([]float64, 60),
 	}
 	return m
@@ -213,5 +215,63 @@ func TestTUI_ThresholdControls(t *testing.T) {
 	mTestMax2, _ := mTestMax.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'='}})
 	if mTestMax2.(model).killThreshold > 100.0 {
 		t.Errorf("Expected killThreshold to be bounded at 100.0, got %f", mTestMax2.(model).killThreshold)
+	}
+}
+
+func TestTUI_ProtectProcesses(t *testing.T) {
+	m := createTestModel()
+	m.width = 100
+	m.height = 100
+
+	// Ensure chrome-remote-desktop is protected by default
+	if !m.protected["chrome-remote-desktop"] {
+		t.Errorf("Expected chrome-remote-desktop to be protected by default")
+	}
+
+	// Add a mock process
+	m.stats[1234] = &ProcStats{
+		PID:        1234,
+		Name:       "test-process",
+		MemoryMB:   100.0,
+		MemoryPct:  10.0,
+		RiseRate:   10.0, // High enough to be a candidate
+		LastUpdate: time.Now(),
+	}
+
+	// Set rows for selection
+	rows := []table.Row{
+		{"1234", "", "test-process", "100.0 MB", "10.0%", "10.00 MB/s"},
+	}
+	m.table.SetRows(rows)
+	m.table.SetCursor(0)
+
+	// Verify "test-process" is not protected yet
+	if m.protected["test-process"] {
+		t.Errorf("Expected test-process to not be protected initially")
+	}
+
+	// Press 'p'
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
+	newModel := m2.(model)
+
+	if !newModel.protected["test-process"] {
+		t.Errorf("Expected test-process to be protected after pressing 'p'")
+	}
+
+	// View should contain "Protected Processes" and "test-process"
+	view := newModel.View()
+	if !strings.Contains(view, "Protected Processes") {
+		t.Errorf("Expected view to contain 'Protected Processes' header")
+	}
+	if !strings.Contains(view, "test-process") {
+		t.Errorf("Expected view to contain 'test-process' in the protected list")
+	}
+
+	// updateStats should exclude test-process from candidates
+	newModel.updateStats()
+	for _, c := range newModel.candidates {
+		if c.Name == "test-process" {
+			t.Errorf("Expected test-process to be excluded from candidates due to being protected")
+		}
 	}
 }
