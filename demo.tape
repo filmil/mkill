@@ -22,6 +22,20 @@ Sleep 6s
 Type "escape"
 Sleep 2s
 
+# Show protection
+Down
+Sleep 1s
+Down
+Sleep 1s
+Type "p"
+Sleep 2s
+Type "p"
+Sleep 2s
+
+# Show saving
+Type "P"
+Sleep 2s
+
 Type "-"
 Sleep 1s
 Type "-"
