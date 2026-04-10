@@ -15,9 +15,10 @@
   2. The system total memory must exceed the **90%** threshold.
   3. The process must NOT be in the "Protected" list.
 
-## Process Protection
-Users can protect critical processes from being automatically terminated.
+## Process Protection and Manual Kill
+Users can protect critical processes from being automatically terminated or manually trigger a termination.
 - **Toggle Protection:** Press `p` on a selected process in the list to toggle its protected status.
+- **Manual Kill:** Press `k` on a selected process to initiate a manual kill. A confirmation dialog will appear. Press `k` again to confirm the kill, or any other key to cancel.
 - **Visual Feedback:** Protected processes are marked with a `p` in the second column of the process table.
 - **Persistence:** Press `P` to save the current list of protected processes to the configuration file.
 - **Configuration:** Settings are stored in `~/.config/mkill/config.json`.

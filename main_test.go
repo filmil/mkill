@@ -314,3 +314,65 @@ func TestTUI_ProtectChromeRemoteDesktopHost(t *testing.T) {
 		t.Errorf("Expected chrome-remote-desktop-host to be protected by default")
 	}
 }
+
+func TestTUI_ManualKillConfirmation(t *testing.T) {
+	m := createTestModel()
+	m.width = 100
+	m.height = 100
+
+	m.stats[1234] = &ProcStats{
+		PID:        1234,
+		Name:       "test-process",
+		MemoryMB:   100.0,
+		MemoryPct:  10.0,
+		RiseRate:   10.0,
+		LastUpdate: time.Now(),
+	}
+
+	// Set rows for selection
+	rows := []table.Row{
+		{"1234", "", "test-process", "100.0 MB", "10.0%", "10.00 MB/s"},
+	}
+	m.table.SetRows(rows)
+	m.table.SetCursor(0)
+
+	// Press 'k' to initiate confirmation
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	newModel := m2.(model)
+
+	if newModel.confirmKillPID != 1234 {
+		t.Errorf("Expected confirmKillPID to be 1234, got %d", newModel.confirmKillPID)
+	}
+
+	// View should contain confirmation text
+	view := newModel.View()
+	if !strings.Contains(view, "Are you sure you want to kill process 1234 (test-process)?") {
+		t.Errorf("Expected confirmation view to contain process info")
+	}
+
+	// Press 'esc' to cancel
+	m3, _ := newModel.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	newModel3 := m3.(model)
+
+	if newModel3.confirmKillPID != 0 {
+		t.Errorf("Expected confirmKillPID to be cleared after cancellation, got %d", newModel3.confirmKillPID)
+	}
+
+	// Press 'k' again to initiate confirmation
+	m4, _ := newModel3.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	newModel4 := m4.(model)
+
+	// Press 'k' to confirm kill
+	m5, cmd := newModel4.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	newModel5 := m5.(model)
+
+	if newModel5.confirmKillPID != 0 {
+		t.Errorf("Expected confirmKillPID to be cleared after confirmation, got %d", newModel5.confirmKillPID)
+	}
+	if !newModel5.killing[1234] {
+		t.Errorf("Expected process 1234 to be in killing state")
+	}
+	if cmd == nil {
+		t.Errorf("Expected a kill command to be returned")
+	}
+}

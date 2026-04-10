@@ -39,6 +39,8 @@ protected processes.
   to persist this config across sessions (saved to
   `~/.config/mkill/config.json`). Protected processes are marked with a `p` in
   the table.
+- **Manual Kill**: Press `k` to kill the currently highlighted process. Requires
+  pressing `k` a second time to confirm.
 - **Help Panel**: Press `?` to toggle a help screen overlay.
 - **Configuration Persistence**: Press `P` to save your protected processes
   list to `~/.config/mkill/config.json`. These settings are automatically
