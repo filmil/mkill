@@ -10,6 +10,14 @@ user-configured kill threshold.
 
 ![mkill demo](demo.gif)
 
+I created `mkill` because I am handling some programs which tend to run
+away with memory use, in a setup which can not be easily sandboxed. It prevents
+the Linux memory killer daemon from activating simply by acting sooner than
+LMKD would. LMKD ends up killing a random process, which then usually ends up
+killing my remote session on a GCP virtual machine, messing up the ongoing
+user workloads. Hence, a monitor program. TUI because I often use text-only
+sessions.
+
 The program keeps a running history of memory use to ensure that it does not
 kill long-running stable programs. It uses the `bubbletea` library to create a
 top-like TUI (Terminal User Interface) widget which displays processes by
