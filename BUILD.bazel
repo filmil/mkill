@@ -6,7 +6,10 @@ gazelle(name = "gazelle")
 
 go_library(
     name = "mkill_lib",
-    srcs = ["main.go"],
+    srcs = [
+        "chart.go",
+        "main.go",
+    ],
     importpath = "mkill",
     visibility = ["//visibility:private"],
     deps = [
@@ -14,7 +17,8 @@ go_library(
         "@com_github_charmbracelet_bubbletea//:bubbletea",
         "@com_github_charmbracelet_lipgloss//:lipgloss",
         "@com_github_charmbracelet_x_ansi//:ansi",
-        "@com_github_guptarohit_asciigraph//:asciigraph",
+        "@com_github_gizak_termui_v3//:termui",
+        "@com_github_gizak_termui_v3//widgets",
         "@com_github_shirou_gopsutil_v3//mem",
         "@com_github_shirou_gopsutil_v3//process",
     ],
@@ -22,7 +26,10 @@ go_library(
 
 go_test(
     name = "mkill_test",
-    srcs = ["main_test.go"],
+    srcs = [
+        "chart_test.go",
+        "main_test.go",
+    ],
     embed = [":mkill_lib"],
     deps = [
         "@com_github_charmbracelet_bubbles//table",

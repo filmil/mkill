@@ -7,7 +7,7 @@ require (
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/charmbracelet/x/ansi v0.11.6
-	github.com/guptarohit/asciigraph v0.9.0
+	github.com/gizak/termui/v3 v3.1.0
 	github.com/shirou/gopsutil/v3 v3.24.5
 )
 
@@ -26,9 +26,11 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-localereader v0.0.1 // indirect
 	github.com/mattn/go-runewidth v0.0.19 // indirect
+	github.com/mitchellh/go-wordwrap v0.0.0-20150314170334-ad45545899c7 // indirect
 	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/muesli/termenv v0.16.0 // indirect
+	github.com/nsf/termbox-go v0.0.0-20190121233118-02980233997d // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect

@@ -46,3 +46,36 @@ Built using `charmbracelet/bubbletea` and `lipgloss`, taking up the full termina
 - Written in Go (1.23+).
 - Built and tested via **Bazel** using `rules_go` and `gazelle`.
 - Automated CI/CD pipelines via GitHub Actions for testing, cross-compilation (Linux/macOS, amd64/arm64), and release generation.
+
+## Subtask: Termui Braille Mode Memory Chart
+The system memory occupancy graph in the Bottom-Right Pane is rendered using
+the [`termui`](https://github.com/gizak/termui) library's `Plot` widget in
+**braille mode** (`widgets.MarkerBraille`). This replaces the previous
+`asciigraph` ASCII implementation and provides a higher-resolution chart by
+exploiting Unicode braille glyphs, where each character cell encodes a 2x4
+sub-grid of dots.
+
+### Requirements
+- **Library:** `github.com/gizak/termui/v3` is added as a Go module
+  dependency. The Bazel build system (`MODULE.bazel` and `BUILD.bazel`) is
+  updated via `gazelle` to wire up the new dependency.
+- **Chart Style:** The data series is drawn in **green**
+  (`ui.ColorGreen`). The braille marker yields a smooth line plot that
+  honours sub-character resolution.
+- **Integration with Bubbletea:** Because `termui` and `bubbletea` both
+  manage the terminal directly, the chart is rendered offline. A
+  `*ui.Buffer` of the desired width and height is allocated, the `Plot`
+  widget is told to draw into it, and the resulting cell grid is
+  serialised to a string with embedded ANSI escape sequences. That string
+  is then composed into the bubbletea `View()` output exactly where the
+  previous ASCII graph was placed.
+- **Data Source:** The same rolling history of system memory occupancy
+  percentages (`totalMemHistory`) feeds the chart.
+- **No Terminal Init:** `termui.Init()` / `termui.Close()` are NOT
+  called; only the widget's pure drawing API is used so it does not
+  conflict with bubbletea's screen management.
+
+### Testing
+A unit test verifies that the chart renderer produces non-empty output and
+contains the expected ANSI green foreground escape sequence when invoked
+with a sample data slice.

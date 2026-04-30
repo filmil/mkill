@@ -37,9 +37,11 @@ protected processes.
   if the process hasn't exited, sends `SIGKILL`.
 - **Interactive TUI**: Top pane for process list, bottom-left pane split
   between a numbered list of kill candidates and protected processes. The
-  bottom-right pane is split between kill history and a real-time ASCII graph
-  of system memory occupancy. The memory occupancy percentage is color-coded
-  green, orange (near limit), and red (over limit).
+  bottom-right pane is split between kill history and a real-time braille
+  line chart (rendered with the [`termui`](https://github.com/gizak/termui)
+  `Plot` widget in green) of system memory occupancy. The memory occupancy
+  percentage is color-coded green, orange (near limit), and red (over
+  limit).
 - **Adjustable Threshold**: Press `+` or `=` to increase, or `-` to decrease
   the kill threshold interactively.
 - **Process Protection**: Press `p` while selecting a process to add its name
