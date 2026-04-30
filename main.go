@@ -16,7 +16,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/guptarohit/asciigraph"
 	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/shirou/gopsutil/v3/process"
 )
@@ -488,8 +487,7 @@ func (m model) View() string {
 			graphHeight = 3
 		}
 
-		graph := asciigraph.Plot(m.totalMemHistory, asciigraph.Height(graphHeight), asciigraph.Width(graphWidth))
-		graphView = graph
+		graphView = renderBrailleChart(m.totalMemHistory, graphWidth, graphHeight)
 	}
 
 	rightTopPane := lipgloss.NewStyle().Height(rightTopHeight).Render(headerStyle.Render("Kill History") + "\n" + historyView)
