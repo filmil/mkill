@@ -44,11 +44,63 @@ type KillEvent struct {
 	Reason string
 }
 
+// memSample holds one sample of system memory occupancy. When the system has
+// swap configured, Occupancy spans the combined RAM + swap pool, since that is
+// the pool the kernel must exhaust before the OOM killer steps in.
+type memSample struct {
+	// Occupancy is the percentage the kill threshold is compared against:
+	// combined RAM + swap when swap is present, RAM alone otherwise.
+	Occupancy float64
+	// RAMPct is the RAM-only occupancy, in percent.
+	RAMPct float64
+	// SwapPct is the swap-only occupancy, in percent. Zero when there is no swap.
+	SwapPct float64
+	// HasSwap is true when the system has a non-empty swap area.
+	HasSwap bool
+}
+
+// combinedMemory folds a virtual memory reading and a swap reading into a
+// single occupancy figure. Either argument may be nil, and a swap area of zero
+// size is treated as "no swap available", in which case the result is the plain
+// RAM occupancy and the previous (swap-less) behaviour is preserved exactly.
+func combinedMemory(v *mem.VirtualMemoryStat, s *mem.SwapMemoryStat) memSample {
+	var out memSample
+	var ramUsed, ramTotal uint64
+	if v != nil && v.Total > 0 {
+		ramTotal = v.Total
+		// Stay consistent with gopsutil's UsedPercent, which counts everything
+		// that is not "available" (i.e. reclaimable cache does not count as used).
+		if v.Available > 0 && v.Available <= v.Total {
+			ramUsed = v.Total - v.Available
+		} else {
+			ramUsed = v.Used
+		}
+		out.RAMPct = v.UsedPercent
+	}
+
+	var swapUsed, swapTotal uint64
+	if s != nil && s.Total > 0 {
+		swapTotal = s.Total
+		swapUsed = s.Used
+		if swapUsed > swapTotal {
+			swapUsed = swapTotal
+		}
+		out.HasSwap = true
+		out.SwapPct = float64(swapUsed) / float64(swapTotal) * 100
+	}
+
+	if total := ramTotal + swapTotal; total > 0 {
+		out.Occupancy = float64(ramUsed+swapUsed) / float64(total) * 100
+	}
+	return out
+}
+
 type model struct {
 	table           table.Model
 	candidates      []*ProcStats
 	killHistory     []KillEvent
 	totalMem        float64
+	memStats        memSample
 	totalMemHistory []float64
 	currentUser     string
 	stats           map[int32]*ProcStats
@@ -158,8 +210,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *model) updateStats() {
 	v, _ := mem.VirtualMemory()
-	m.totalMem = v.UsedPercent
-	m.totalMemHistory = append(m.totalMemHistory, v.UsedPercent)
+	sw, _ := mem.SwapMemory()
+	m.memStats = combinedMemory(v, sw)
+	m.totalMem = m.memStats.Occupancy
+	m.totalMemHistory = append(m.totalMemHistory, m.totalMem)
 	if len(m.totalMemHistory) > 60 { // Keep last 60 points for the graph
 		m.totalMemHistory = m.totalMemHistory[len(m.totalMemHistory)-60:]
 	}
@@ -347,6 +401,15 @@ var (
 			MarginBottom(1)
 )
 
+// memGraphTitle names the memory occupancy graph, making it explicit when the
+// plotted series covers the combined RAM + swap pool.
+func (m model) memGraphTitle() string {
+	if m.memStats.HasSwap {
+		return "System Memory Occupancy, RAM+Swap (%)"
+	}
+	return "System Memory Occupancy (%)"
+}
+
 func (m model) helpView() string {
 	helpText := "MKILL - Help\n\n" +
 		"Keyboard Shortcuts:\n" +
@@ -361,6 +424,8 @@ func (m model) helpView() string {
 		"  p           Toggle 'protect' status of selected process\n" +
 		"  k           Kill highlighted process (requires confirmation)\n" +
 		"  P           Save protected processes to config\n\n" +
+		"When the system has swap, the kill threshold is compared against the\n" +
+		"combined RAM + swap occupancy; the header also breaks out RAM and swap.\n\n" +
 		"Press 'esc' to return to the main view."
 	box := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
@@ -370,7 +435,6 @@ func (m model) helpView() string {
 
 	return box
 }
-
 
 func placeOverlay(x, y int, fg, bg string) string {
 	fgLines := strings.Split(fg, "\n")
@@ -408,7 +472,7 @@ func (m model) View() string {
 		confirmText := fmt.Sprintf("Are you sure you want to kill process %d (%s)?\n\nPress 'k' to confirm or any other key to cancel.", m.confirmKillPID, m.confirmKillName)
 		modalBox = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("9") ).
+			BorderForeground(lipgloss.Color("9")).
 			Padding(1, 4).
 			Render(confirmText)
 	}
@@ -419,7 +483,11 @@ func (m model) View() string {
 	} else if m.totalMem >= m.killThreshold*0.9 {
 		memColor = "#FFA500" // Orange
 	}
-	memStatus := lipgloss.NewStyle().Foreground(lipgloss.Color(memColor)).Render(fmt.Sprintf("Total Memory: %.1f%%", m.totalMem))
+	memText := fmt.Sprintf("Total Memory: %.1f%%", m.totalMem)
+	if m.memStats.HasSwap {
+		memText += fmt.Sprintf(" (RAM: %.1f%% | Swap: %.1f%%)", m.memStats.RAMPct, m.memStats.SwapPct)
+	}
+	memStatus := lipgloss.NewStyle().Foreground(lipgloss.Color(memColor)).Render(memText)
 	header := titleStyle.Render("MKILL - Memory Watchcat") + " " + memStatus + " (Threshold: " + fmt.Sprintf("%.1f%%", m.killThreshold) + ")\n"
 	topPane := baseStyle.Width(m.width - 2).Render(m.table.View())
 
@@ -491,7 +559,7 @@ func (m model) View() string {
 	}
 
 	rightTopPane := lipgloss.NewStyle().Height(rightTopHeight).Render(headerStyle.Render("Kill History") + "\n" + historyView)
-	rightBottomPane := lipgloss.NewStyle().Height(rightBottomHeight).Render(headerStyle.Render("System Memory Occupancy (%)") + "\n" + graphView)
+	rightBottomPane := lipgloss.NewStyle().Height(rightBottomHeight).Render(headerStyle.Render(m.memGraphTitle()) + "\n" + graphView)
 
 	rightPane := baseStyle.Width((m.width - 4) / 2).Height(bottomHeight).Render(lipgloss.JoinVertical(lipgloss.Left, rightTopPane, rightBottomPane))
 
@@ -505,8 +573,12 @@ func (m model) View() string {
 		modalHeight := lipgloss.Height(modalBox)
 		x := (m.width - modalWidth) / 2
 		y := (m.height - modalHeight) / 2
-		if x < 0 { x = 0 }
-		if y < 0 { y = 0 }
+		if x < 0 {
+			x = 0
+		}
+		if y < 0 {
+			y = 0
+		}
 		return placeOverlay(x, y, modalBox, mainView)
 	}
 	return mainView

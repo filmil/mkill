@@ -7,6 +7,8 @@ import (
 
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/x/ansi"
+	"github.com/shirou/gopsutil/v3/mem"
 )
 
 func createTestModel() model {
@@ -375,5 +377,114 @@ func TestTUI_ManualKillConfirmation(t *testing.T) {
 	}
 	if cmd == nil {
 		t.Errorf("Expected a kill command to be returned")
+	}
+}
+
+func TestCombinedMemory_NoSwap(t *testing.T) {
+	v := &mem.VirtualMemoryStat{Total: 1000, Available: 100, Used: 900, UsedPercent: 90.0}
+
+	for name, s := range map[string]*mem.SwapMemoryStat{
+		"nil swap":  nil,
+		"zero swap": {Total: 0, Used: 0},
+	} {
+		got := combinedMemory(v, s)
+		if got.HasSwap {
+			t.Errorf("%s: expected HasSwap to be false", name)
+		}
+		if got.SwapPct != 0 {
+			t.Errorf("%s: expected SwapPct 0, got %f", name, got.SwapPct)
+		}
+		// Without swap the occupancy must match the plain RAM occupancy.
+		if got.Occupancy != 90.0 || got.RAMPct != 90.0 {
+			t.Errorf("%s: expected 90%% occupancy, got %f (RAM %f)", name, got.Occupancy, got.RAMPct)
+		}
+	}
+}
+
+func TestCombinedMemory_WithSwap(t *testing.T) {
+	// 1000 bytes RAM, 900 used; 1000 bytes swap, 500 used.
+	// Combined: 1400 / 2000 = 70%.
+	v := &mem.VirtualMemoryStat{Total: 1000, Available: 100, Used: 900, UsedPercent: 90.0}
+	s := &mem.SwapMemoryStat{Total: 1000, Used: 500, Free: 500, UsedPercent: 50.0}
+
+	got := combinedMemory(v, s)
+	if !got.HasSwap {
+		t.Fatalf("expected HasSwap to be true")
+	}
+	if got.Occupancy != 70.0 {
+		t.Errorf("expected combined occupancy 70%%, got %f", got.Occupancy)
+	}
+	if got.RAMPct != 90.0 {
+		t.Errorf("expected RAMPct 90%%, got %f", got.RAMPct)
+	}
+	if got.SwapPct != 50.0 {
+		t.Errorf("expected SwapPct 50%%, got %f", got.SwapPct)
+	}
+}
+
+func TestCombinedMemory_UsedFallbackAndClamping(t *testing.T) {
+	// No Available reading: fall back to Used.
+	v := &mem.VirtualMemoryStat{Total: 1000, Used: 400, UsedPercent: 40.0}
+	// Used larger than Total must be clamped so occupancy cannot exceed 100%.
+	s := &mem.SwapMemoryStat{Total: 1000, Used: 1200}
+
+	got := combinedMemory(v, s)
+	if got.Occupancy != 70.0 {
+		t.Errorf("expected combined occupancy 70%%, got %f", got.Occupancy)
+	}
+	if got.SwapPct != 100.0 {
+		t.Errorf("expected SwapPct clamped to 100%%, got %f", got.SwapPct)
+	}
+}
+
+func TestCombinedMemory_NilReadings(t *testing.T) {
+	got := combinedMemory(nil, nil)
+	if got.Occupancy != 0 || got.RAMPct != 0 || got.SwapPct != 0 || got.HasSwap {
+		t.Errorf("expected zero sample for nil readings, got %+v", got)
+	}
+}
+
+func TestTUI_HeaderShowsSwapBreakdown(t *testing.T) {
+	m := createTestModel()
+	m.width, m.height = 120, 40
+	m.totalMem = 70.0
+	m.memStats = memSample{Occupancy: 70.0, RAMPct: 90.0, SwapPct: 50.0, HasSwap: true}
+
+	view := ansi.Strip(m.View())
+	if !strings.Contains(view, "Total Memory: 70.0%") {
+		t.Errorf("expected combined occupancy in header, got:\n%s", view)
+	}
+	if !strings.Contains(view, "RAM: 90.0%") || !strings.Contains(view, "Swap: 50.0%") {
+		t.Errorf("expected RAM/swap breakdown in header, got:\n%s", view)
+	}
+	if !strings.Contains(view, "RAM+Swap") {
+		t.Errorf("expected graph title to mention RAM+Swap, got:\n%s", view)
+	}
+
+	// Without swap the header stays as it was before swap support.
+	m.memStats = memSample{Occupancy: 90.0, RAMPct: 90.0}
+	m.totalMem = 90.0
+	view = ansi.Strip(m.View())
+	if strings.Contains(view, "Swap:") {
+		t.Errorf("expected no swap breakdown without swap, got:\n%s", view)
+	}
+}
+
+func TestTUI_KillTriggerUsesCombinedOccupancy(t *testing.T) {
+	m := createTestModel()
+	m.candidates = []*ProcStats{{PID: 1234, Name: "hog", RiseRate: 10.0}}
+
+	// RAM alone is over the threshold, but the combined pool is not: no kill.
+	m.memStats = memSample{Occupancy: 70.0, RAMPct: 95.0, SwapPct: 45.0, HasSwap: true}
+	m.totalMem = m.memStats.Occupancy
+	if cmd := m.checkAndKill(); cmd != nil {
+		t.Errorf("expected no kill when combined occupancy is below threshold")
+	}
+
+	// Combined pool over the threshold: kill.
+	m.memStats = memSample{Occupancy: 95.0, RAMPct: 99.0, SwapPct: 91.0, HasSwap: true}
+	m.totalMem = m.memStats.Occupancy
+	if cmd := m.checkAndKill(); cmd == nil {
+		t.Errorf("expected a kill when combined occupancy is over threshold")
 	}
 }

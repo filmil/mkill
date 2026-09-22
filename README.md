@@ -30,6 +30,13 @@ protected processes.
 
 - **Continuous Monitoring**: Scans all processes owned by the current user
   every 2 seconds acting as a memory watchcat.
+- **Swap Aware**: When the system has swap configured, memory occupancy is
+  measured over the combined RAM + swap pool (`(RAM used + swap used) / (RAM
+  total + swap total)`), since that is the pool which must be exhausted before
+  the kernel OOM killer steps in. The header breaks out the RAM-only and
+  swap-only percentages next to the combined figure, and the occupancy chart
+  plots the combined value. Without swap, behavior is unchanged: the threshold
+  applies to RAM occupancy alone.
 - **Smart Killing**: Triggers only when system memory exceeds the threshold.
   Identifies "sharp risers" by calculating the rate of memory growth (MB/s) and
   comparing current usage against a history of the last 10 samples.
@@ -41,7 +48,8 @@ protected processes.
   line chart (rendered with the [`termui`](https://github.com/gizak/termui)
   `Plot` widget in green) of system memory occupancy. The memory occupancy
   percentage is color-coded green, orange (near limit), and red (over
-  limit).
+  limit). On systems with swap, the header reads e.g. `Total Memory: 70.0%
+  (RAM: 90.0% | Swap: 50.0%)`.
 - **Adjustable Threshold**: Press `+` or `=` to increase, or `-` to decrease
   the kill threshold interactively.
 - **Process Protection**: Press `p` while selecting a process to add its name
