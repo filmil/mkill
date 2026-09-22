@@ -5,6 +5,23 @@
 
 ## Core Logic & Thresholds
 - **Monitoring Scope:** Only processes owned by the current user.
+- **Memory Occupancy (RAM + Swap):** The figure compared against the kill
+  threshold is produced by `combinedMemory(*mem.VirtualMemoryStat,
+  *mem.SwapMemoryStat)`, which returns a `memSample{Occupancy, RAMPct, SwapPct,
+  HasSwap}`.
+  - When swap is present (`SwapMemoryStat.Total > 0`), `Occupancy` spans the
+    combined pool: `(ramUsed + swapUsed) / (ramTotal + swapTotal) * 100`. That
+    pool is what the kernel must exhaust before the OOM killer runs, so it is
+    the honest measure of how close the system is to an OOM event.
+  - `ramUsed` is `Total - Available` (falling back to `Used` when `Available` is
+    unavailable), keeping it consistent with gopsutil's `UsedPercent`, i.e.
+    reclaimable page cache does not count as used. `swapUsed` is clamped to
+    `swapTotal`.
+  - Without swap (or when a reading is `nil`), `Occupancy` is the plain RAM
+    occupancy and behavior is identical to the pre-swap implementation.
+  - `RAMPct` and `SwapPct` are carried alongside for display only; they do not
+    take part in the kill decision.
+  - The rolling `totalMemHistory` that feeds the chart stores `Occupancy`.
 - **Refresh Interval:** The system state and UI refresh every 2 seconds.
 - **Critical Threshold:** Kill evaluations only occur when the total system memory utilization exceeds **90%**.
 - **Spike Detection:** 
@@ -34,13 +51,13 @@ When a process meets the kill criteria, the application performs an asynchronous
 
 ## User Interface
 Built using `charmbracelet/bubbletea` and `lipgloss`, taking up the full terminal window.
-- **Header:** Displays the application title and current total system memory percentage (color-coded: Green < 80%, Yellow > 80%, Red > 90%).
+- **Header:** Displays the application title and current total system memory percentage (color-coded: Green < 80%, Yellow > 80%, Red > 90%). When swap is available, the combined percentage is followed by the RAM and swap breakdown, e.g. `Total Memory: 70.0% (RAM: 90.0% | Swap: 50.0%)`.
 - **Top Pane (Process List):** A table displaying PID, Protection status (P), Name, Age (process lifetime), Memory (MB), Memory (%), and Rise Rate (MB/s). Sorted descending by total memory.
 - **Bottom-Left Pane (Candidates & Protected):** Split into two sections:
   - **Kill Candidates:** A numbered list of the top 10 processes currently exhibiting sharp memory growth.
   - **Protected Processes:** A list of processes currently marked as protected.
-- **Bottom-Right Pane (Kill History & Memory Graph):** The top half logs recently killed processes (timestamp, PID, name, rate). The list automatically hides older entries off the bottom to ensure the pane fits exactly within the terminal window. The bottom half displays a real-time ASCII graph of the system's total memory occupancy (%).
-- **Help Overlay:** A full-screen, centered overlay displaying keyboard shortcuts, toggled via the `?` key and closed via `esc`. Also mentions `=` and `-` for adjusting the kill threshold, and `p`/`P` for protection.
+- **Bottom-Right Pane (Kill History & Memory Graph):** The top half logs recently killed processes (timestamp, PID, name, rate). The list automatically hides older entries off the bottom to ensure the pane fits exactly within the terminal window. The bottom half displays a real-time ASCII graph of the system's total memory occupancy (%), titled `System Memory Occupancy, RAM+Swap (%)` when swap is present and `System Memory Occupancy (%)` otherwise.
+- **Help Overlay:** A full-screen, centered overlay displaying keyboard shortcuts, toggled via the `?` key and closed via `esc`. Also mentions `=` and `-` for adjusting the kill threshold, `p`/`P` for protection, and a note that the threshold is compared against combined RAM + swap occupancy when swap is present.
 
 ## Build System
 - Written in Go (1.23+).
