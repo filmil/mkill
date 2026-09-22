@@ -37,6 +37,13 @@ protected processes.
   swap-only percentages next to the combined figure, and the occupancy chart
   plots the combined value. Without swap, behavior is unchanged: the threshold
   applies to RAM occupancy alone.
+- **Swap Kill Threshold**: A separate, configurable threshold on swap-only
+  occupancy. A sharp riser is killed when the combined occupancy reaches the
+  memory threshold **or** when swap occupancy alone reaches the swap threshold
+  (default 90%) — which catches thrashing that the combined figure hides on a
+  machine with a large swap area. Press `]` / `[` to adjust it, and `P` to save
+  it to `~/.config/mkill/config.json` (as `swap_threshold`) along with the
+  protected list. Configs written before this setting existed keep the default.
 - **Smart Killing**: Triggers only when system memory exceeds the threshold.
   Identifies "sharp risers" by calculating the rate of memory growth (MB/s) and
   comparing current usage against a history of the last 10 samples.
@@ -49,9 +56,10 @@ protected processes.
   `Plot` widget in green) of system memory occupancy. The memory occupancy
   percentage is color-coded green, orange (near limit), and red (over
   limit). On systems with swap, the header reads e.g. `Total Memory: 70.0%
-  (RAM: 90.0% | Swap: 50.0%)`.
+  (RAM: 90.0% | Swap: 50.0%) (Threshold: 90.0% | Swap: 85.0%)`.
 - **Adjustable Threshold**: Press `+` or `=` to increase, or `-` to decrease
-  the kill threshold interactively.
+  the kill threshold interactively. Press `]` or `[` to adjust the swap kill
+  threshold the same way.
 - **Process Protection**: Press `p` while selecting a process to add its name
   to the global protect list, preventing it from ever being killed. Press `P`
   to persist this config across sessions (saved to
@@ -61,7 +69,7 @@ protected processes.
   pressing `k` a second time to confirm.
 - **Help Panel**: Press `?` to toggle a help screen overlay.
 - **Configuration Persistence**: Press `P` to save your protected processes
-  list to `~/.config/mkill/config.json`. These settings are automatically
+  list and swap kill threshold to `~/.config/mkill/config.json`. These settings are automatically
   loaded on startup.
 
 ## Installation
