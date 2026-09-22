@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -28,6 +29,7 @@ func createTestModel() model {
 		stats:           make(map[int32]*ProcStats),
 		killing:         make(map[int32]bool),
 		killThreshold:   90.0,
+		swapThreshold:   90.0,
 		protected:       map[string]bool{"chrome-remote-desktop": true, "chrome-remote-desktop-host": true, "chrome": true},
 		totalMemHistory: make([]float64, 60)}
 	return m
@@ -287,7 +289,10 @@ func TestTUI_ConfigLoadAndSave(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", tempDir)
 
 	// Ensure default loads correctly when file doesn't exist
-	loaded := loadConfig()
+	loaded, swap := loadConfig()
+	if swap != swapKillThreshold {
+		t.Errorf("Expected default swap threshold %f, got %f", float64(swapKillThreshold), swap)
+	}
 	if !loaded["chrome-remote-desktop-host"] {
 		t.Errorf("Expected chrome-remote-desktop-host to be loaded from default config")
 	}
@@ -300,7 +305,7 @@ func TestTUI_ConfigLoadAndSave(t *testing.T) {
 	_ = m2.(model)
 
 	// Load config again from disk
-	loaded2 := loadConfig()
+	loaded2, _ := loadConfig()
 	if !loaded2["test-json-custom"] {
 		t.Errorf("Expected test-json-custom to be saved and loaded from JSON config")
 	}
@@ -486,5 +491,115 @@ func TestTUI_KillTriggerUsesCombinedOccupancy(t *testing.T) {
 	m.totalMem = m.memStats.Occupancy
 	if cmd := m.checkAndKill(); cmd == nil {
 		t.Errorf("expected a kill when combined occupancy is over threshold")
+	}
+}
+
+func TestTUI_SwapThresholdControls(t *testing.T) {
+	m := createTestModel()
+	initial := m.swapThreshold
+
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{']'}})
+	if m2.(model).swapThreshold <= initial {
+		t.Errorf("Expected swapThreshold to increase, got %f (initial %f)", m2.(model).swapThreshold, initial)
+	}
+	// The memory threshold must not move along with it.
+	if m2.(model).killThreshold != m.killThreshold {
+		t.Errorf("Expected killThreshold to stay at %f, got %f", m.killThreshold, m2.(model).killThreshold)
+	}
+
+	m3, _ := m2.(model).Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'['}})
+	if m3.(model).swapThreshold != initial {
+		t.Errorf("Expected swapThreshold to return to %f, got %f", initial, m3.(model).swapThreshold)
+	}
+
+	// Bounds.
+	mMax := createTestModel()
+	mMax.swapThreshold = 99.5
+	mMax2, _ := mMax.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{']'}})
+	if mMax2.(model).swapThreshold > 100.0 {
+		t.Errorf("Expected swapThreshold to be bounded at 100.0, got %f", mMax2.(model).swapThreshold)
+	}
+
+	mMin := createTestModel()
+	mMin.swapThreshold = 0.5
+	mMin2, _ := mMin.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'['}})
+	if mMin2.(model).swapThreshold < 0.0 {
+		t.Errorf("Expected swapThreshold to be bounded at 0.0, got %f", mMin2.(model).swapThreshold)
+	}
+}
+
+func TestTUI_SwapThresholdTriggersKill(t *testing.T) {
+	m := createTestModel()
+	m.swapThreshold = 85.0
+	m.candidates = []*ProcStats{{PID: 1234, Name: "hog", RiseRate: 10.0}}
+
+	// Combined pool calm, swap below its own threshold: no kill.
+	m.memStats = memSample{Occupancy: 70.0, RAMPct: 90.0, SwapPct: 50.0, HasSwap: true}
+	m.totalMem = m.memStats.Occupancy
+	if cmd := m.checkAndKill(); cmd != nil {
+		t.Errorf("expected no kill below both thresholds")
+	}
+
+	// Combined pool still calm, but swap is nearly full: kill on swap alone.
+	m.memStats = memSample{Occupancy: 70.0, RAMPct: 90.0, SwapPct: 92.1, HasSwap: true}
+	m.totalMem = m.memStats.Occupancy
+	if cmd := m.checkAndKill(); cmd == nil {
+		t.Fatalf("expected a kill when swap occupancy is over the swap threshold")
+	}
+	if trigger, over := m.killTrigger(); !over || !strings.Contains(trigger, "swap 92.1%") {
+		t.Errorf("expected the swap trigger to be reported, got %q (over=%v)", trigger, over)
+	}
+
+	// A system without swap never trips the swap threshold.
+	mNoSwap := createTestModel()
+	mNoSwap.swapThreshold = 0.0
+	mNoSwap.candidates = []*ProcStats{{PID: 1234, Name: "hog", RiseRate: 10.0}}
+	mNoSwap.memStats = memSample{Occupancy: 50.0, RAMPct: 50.0}
+	mNoSwap.totalMem = 50.0
+	if cmd := mNoSwap.checkAndKill(); cmd != nil {
+		t.Errorf("expected no kill without swap even at a 0%% swap threshold")
+	}
+}
+
+func TestTUI_SwapThresholdPersistence(t *testing.T) {
+	tempDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tempDir)
+
+	m := createTestModel()
+	m.swapThreshold = 77.0
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'P'}})
+
+	_, swap := loadConfig()
+	if swap != 77.0 {
+		t.Errorf("Expected the saved swap threshold 77.0 to be loaded back, got %f", swap)
+	}
+
+	// A config written before the setting existed keeps the default.
+	path, err := getConfigPath()
+	if err != nil {
+		t.Fatalf("getConfigPath: %v", err)
+	}
+	if err := os.WriteFile(path, []byte(`{"protected":["chrome"]}`), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	protected, swap := loadConfig()
+	if swap != swapKillThreshold {
+		t.Errorf("Expected legacy config to fall back to %f, got %f", float64(swapKillThreshold), swap)
+	}
+	if !protected["chrome"] {
+		t.Errorf("Expected legacy config to still load the protected list")
+	}
+}
+
+func TestTUI_HeaderShowsSwapThreshold(t *testing.T) {
+	m := createTestModel()
+	m.width, m.height = 140, 40
+	m.swapThreshold = 85.0
+	m.totalMem = 70.0
+	m.memStats = memSample{Occupancy: 70.0, RAMPct: 90.0, SwapPct: 92.1, HasSwap: true}
+
+	view := ansi.Strip(m.View())
+	if !strings.Contains(view, "Threshold: 90.0% | Swap: 85.0%") {
+		t.Errorf("expected both thresholds in the header, got:\n%s", view)
 	}
 }

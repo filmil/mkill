@@ -27,9 +27,26 @@
 - **Spike Detection:** 
   - The program maintains a rolling history of the last 10 memory samples for each process.
   - A process is considered a "sharp riser" (candidate) if its memory growth rate exceeds 0.5 MB/s.
+- **Swap Kill Threshold:** A second threshold, `swapThreshold`, applies to
+  swap-only occupancy (`memSample.SwapPct`) and defaults to
+  `swapKillThreshold` (**90%**). It exists because on a machine with a large
+  swap area the combined pool figure stays low while the system thrashes.
+  - `model.killTrigger()` returns the tripped trigger and reports over-threshold
+    when `Occupancy >= killThreshold` **or** (swap is present and
+    `SwapPct >= swapThreshold`). The mem threshold is checked first, so its
+    trigger wins when both are over.
+  - The trigger is recorded in the kill reason, e.g.
+    `Spike: 10.00 MB/s, swap 92.1%`.
+  - Adjusted interactively with `]` (increase) and `[` (decrease), clamped to
+    0-100 in steps of 1.0, exactly like `+`/`-` for the memory threshold.
+  - Persisted to `config.json` as `swap_threshold` when `P` is pressed. The
+    field is decoded through a `*float64`, so a config predating the setting
+    (or omitting the key) falls back to the default instead of being read as 0%.
+  - Without swap the threshold never trips, whatever its value.
 - **Kill Criteria:** To be terminated, a process must:
   1. Be the top sharpest riser (highest growth rate).
-  2. The system total memory must exceed the **90%** threshold.
+  2. The system total memory must exceed the **90%** threshold, or swap
+     occupancy must reach the swap kill threshold.
   3. The process must NOT be in the "Protected" list.
 
 ## Process Protection and Manual Kill
@@ -38,7 +55,8 @@ Users can protect critical processes from being automatically terminated or manu
 - **Manual Kill:** Press `k` on a selected process to initiate a manual kill. A confirmation dialog will appear. Press `k` again to confirm the kill, or any other key to cancel.
 - **Visual Feedback:** Protected processes are marked with a `p` in the second column of the process table.
 - **Persistence:** Press `P` to save the current list of protected processes to the configuration file.
-- **Configuration:** Settings are stored in `~/.config/mkill/config.json`.
+- **Configuration:** Settings are stored in `~/.config/mkill/config.json`, as
+  `{"protected": [...], "swap_threshold": 90}`.
 - **Default Protected:** By default, common critical applications like Chrome and Chrome Remote Desktop are protected.
 
 ## Graceful Termination Procedure
@@ -51,13 +69,13 @@ When a process meets the kill criteria, the application performs an asynchronous
 
 ## User Interface
 Built using `charmbracelet/bubbletea` and `lipgloss`, taking up the full terminal window.
-- **Header:** Displays the application title and current total system memory percentage (color-coded: Green < 80%, Yellow > 80%, Red > 90%). When swap is available, the combined percentage is followed by the RAM and swap breakdown, e.g. `Total Memory: 70.0% (RAM: 90.0% | Swap: 50.0%)`.
+- **Header:** Displays the application title and current total system memory percentage (color-coded: Green < 80%, Yellow > 80%, Red > 90%). When swap is available, the combined percentage is followed by the RAM and swap breakdown, e.g. `Total Memory: 70.0% (RAM: 90.0% | Swap: 50.0%)`, and the threshold readout gains the swap threshold: `(Threshold: 90.0% | Swap: 85.0%)`. The readout turns red when either threshold is reached.
 - **Top Pane (Process List):** A table displaying PID, Protection status (P), Name, Age (process lifetime), Memory (MB), Memory (%), and Rise Rate (MB/s). Sorted descending by total memory.
 - **Bottom-Left Pane (Candidates & Protected):** Split into two sections:
   - **Kill Candidates:** A numbered list of the top 10 processes currently exhibiting sharp memory growth.
   - **Protected Processes:** A list of processes currently marked as protected.
 - **Bottom-Right Pane (Kill History & Memory Graph):** The top half logs recently killed processes (timestamp, PID, name, rate). The list automatically hides older entries off the bottom to ensure the pane fits exactly within the terminal window. The bottom half displays a real-time ASCII graph of the system's total memory occupancy (%), titled `System Memory Occupancy, RAM+Swap (%)` when swap is present and `System Memory Occupancy (%)` otherwise.
-- **Help Overlay:** A full-screen, centered overlay displaying keyboard shortcuts, toggled via the `?` key and closed via `esc`. Also mentions `=` and `-` for adjusting the kill threshold, `p`/`P` for protection, and a note that the threshold is compared against combined RAM + swap occupancy when swap is present.
+- **Help Overlay:** A full-screen, centered overlay displaying keyboard shortcuts, toggled via the `?` key and closed via `esc`. Also mentions `=` and `-` for adjusting the kill threshold, `p`/`P` for protection, `]`/`[` for adjusting the swap kill threshold, and a note that the threshold is compared against combined RAM + swap occupancy when swap is present.
 
 ## Build System
 - Written in Go (1.23+).

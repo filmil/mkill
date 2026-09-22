@@ -24,6 +24,11 @@ const (
 	refreshInterval = 2 * time.Second
 	historyLimit    = 10
 	killThreshold   = 90.0 // Percent
+	// swapKillThreshold is the default swap-only occupancy, in percent, above
+	// which a sharp riser is killed even if the combined RAM + swap pool is
+	// still below killThreshold. Heavy swap use means thrashing, which the
+	// combined figure hides on machines with a large swap area.
+	swapKillThreshold = 90.0 // Percent
 )
 
 type ProcStats struct {
@@ -110,6 +115,7 @@ type model struct {
 	confirmKillName string
 	killing         map[int32]bool
 	killThreshold   float64
+	swapThreshold   float64
 	protected       map[string]bool
 }
 type tickMsg time.Time
@@ -141,6 +147,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.killThreshold -= 1.0
 			if m.killThreshold < 0.0 {
 				m.killThreshold = 0.0
+			}
+		case "]":
+			m.swapThreshold += 1.0
+			if m.swapThreshold > 100.0 {
+				m.swapThreshold = 100.0
+			}
+		case "[":
+			m.swapThreshold -= 1.0
+			if m.swapThreshold < 0.0 {
+				m.swapThreshold = 0.0
 			}
 		case "p":
 			if row := m.table.SelectedRow(); row != nil {
@@ -175,7 +191,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case "P":
-			_ = saveConfig(m.protected)
+			_ = saveConfig(m.protected, m.swapThreshold)
 		}
 
 		if m.confirmKillPID != 0 && msg.String() != "k" {
@@ -327,8 +343,23 @@ func (m *model) updateStats() {
 	})
 }
 
+// killTrigger reports whether the system is over a kill threshold, and which
+// one tripped. Swap occupancy is checked separately from the combined pool:
+// on a machine with a large swap area the combined figure stays low while the
+// system thrashes, so a full swap must be able to trigger a kill on its own.
+func (m *model) killTrigger() (string, bool) {
+	if m.totalMem >= m.killThreshold {
+		return fmt.Sprintf("mem %.1f%%", m.totalMem), true
+	}
+	if m.memStats.HasSwap && m.memStats.SwapPct >= m.swapThreshold {
+		return fmt.Sprintf("swap %.1f%%", m.memStats.SwapPct), true
+	}
+	return "", false
+}
+
 func (m *model) checkAndKill() tea.Cmd {
-	if m.totalMem < m.killThreshold {
+	trigger, over := m.killTrigger()
+	if !over {
 		return nil
 	}
 	if len(m.candidates) == 0 {
@@ -342,7 +373,7 @@ func (m *model) checkAndKill() tea.Cmd {
 	}
 	m.killing[target.PID] = true
 
-	reasonBase := fmt.Sprintf("Spike: %.2f MB/s", target.RiseRate)
+	reasonBase := fmt.Sprintf("Spike: %.2f MB/s, %s", target.RiseRate, trigger)
 	return killProcessCmd(target.PID, target.Name, reasonBase)
 }
 
@@ -421,11 +452,15 @@ func (m model) helpView() string {
 		"  home/end, g/G Go to top/bottom of list\n" +
 		"  +, =        Increase memory kill threshold\n" +
 		"  -           Decrease memory kill threshold\n" +
+		"  ]           Increase swap kill threshold\n" +
+		"  [           Decrease swap kill threshold\n" +
 		"  p           Toggle 'protect' status of selected process\n" +
 		"  k           Kill highlighted process (requires confirmation)\n" +
 		"  P           Save protected processes to config\n\n" +
 		"When the system has swap, the kill threshold is compared against the\n" +
-		"combined RAM + swap occupancy; the header also breaks out RAM and swap.\n\n" +
+		"combined RAM + swap occupancy; the header also breaks out RAM and swap.\n" +
+		"A kill is also triggered when swap occupancy alone reaches the separate\n" +
+		"swap kill threshold, which 'P' saves along with the protected list.\n\n" +
 		"Press 'esc' to return to the main view."
 	box := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
@@ -477,10 +512,11 @@ func (m model) View() string {
 			Render(confirmText)
 	}
 
+	swapOver := m.memStats.HasSwap && m.memStats.SwapPct >= m.swapThreshold
 	memColor := "#00FF00" // Green
-	if m.totalMem >= m.killThreshold {
+	if m.totalMem >= m.killThreshold || swapOver {
 		memColor = "#FF0000" // Red
-	} else if m.totalMem >= m.killThreshold*0.9 {
+	} else if m.totalMem >= m.killThreshold*0.9 || (m.memStats.HasSwap && m.memStats.SwapPct >= m.swapThreshold*0.9) {
 		memColor = "#FFA500" // Orange
 	}
 	memText := fmt.Sprintf("Total Memory: %.1f%%", m.totalMem)
@@ -488,7 +524,12 @@ func (m model) View() string {
 		memText += fmt.Sprintf(" (RAM: %.1f%% | Swap: %.1f%%)", m.memStats.RAMPct, m.memStats.SwapPct)
 	}
 	memStatus := lipgloss.NewStyle().Foreground(lipgloss.Color(memColor)).Render(memText)
-	header := titleStyle.Render("MKILL - Memory Watchcat") + " " + memStatus + " (Threshold: " + fmt.Sprintf("%.1f%%", m.killThreshold) + ")\n"
+	thresholdText := fmt.Sprintf(" (Threshold: %.1f%%", m.killThreshold)
+	if m.memStats.HasSwap {
+		thresholdText += fmt.Sprintf(" | Swap: %.1f%%", m.swapThreshold)
+	}
+	thresholdText += ")\n"
+	header := titleStyle.Render("MKILL - Memory Watchcat") + " " + memStatus + thresholdText
 	topPane := baseStyle.Width(m.width - 2).Render(m.table.View())
 
 	bottomHeight := m.height - (m.height / 2) - 6
@@ -585,6 +626,8 @@ func (m model) View() string {
 }
 
 func main() {
+	protected, swapThresholdCfg := loadConfig()
+
 	columns := []table.Column{
 		{Title: "PID", Width: 8},
 		{Title: "P", Width: 3},
@@ -616,9 +659,10 @@ func main() {
 		table:           t,
 		stats:           make(map[int32]*ProcStats),
 		killing:         make(map[int32]bool),
-		killThreshold:   90.0,
+		killThreshold:   killThreshold,
+		swapThreshold:   swapThresholdCfg,
 		totalMemHistory: make([]float64, 60),
-		protected:       loadConfig(),
+		protected:       protected,
 	}
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
@@ -633,7 +677,18 @@ func getConfigPath() (string, error) {
 	return filepath.Join(configDir, "mkill", "config.json"), nil
 }
 
-func loadConfig() map[string]bool {
+// configFile is the on-disk shape of ~/.config/mkill/config.json.
+// SwapThreshold is a pointer so that a config written before the setting
+// existed (or one that simply omits it) falls back to the default rather than
+// being read as a swap threshold of 0%, which would kill on any swap use.
+type configFile struct {
+	Protected     []string `json:"protected"`
+	SwapThreshold *float64 `json:"swap_threshold,omitempty"`
+}
+
+// loadConfig returns the protected process names and the swap kill threshold,
+// falling back to the defaults when the config file is missing or unreadable.
+func loadConfig() (map[string]bool, float64) {
 	defaultProtected := map[string]bool{
 		"chrome-remote-desktop":      true,
 		"chrome-remote-desktop-host": true,
@@ -641,26 +696,28 @@ func loadConfig() map[string]bool {
 	}
 	path, err := getConfigPath()
 	if err != nil {
-		return defaultProtected
+		return defaultProtected, swapKillThreshold
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return defaultProtected
+		return defaultProtected, swapKillThreshold
 	}
-	var cfg struct {
-		Protected []string `json:"protected"`
-	}
+	var cfg configFile
 	if err := json.Unmarshal(data, &cfg); err != nil {
-		return defaultProtected
+		return defaultProtected, swapKillThreshold
 	}
 	protected := make(map[string]bool)
 	for _, p := range cfg.Protected {
 		protected[p] = true
 	}
-	return protected
+	swap := float64(swapKillThreshold)
+	if cfg.SwapThreshold != nil {
+		swap = *cfg.SwapThreshold
+	}
+	return protected, swap
 }
 
-func saveConfig(protected map[string]bool) error {
+func saveConfig(protected map[string]bool, swapThreshold float64) error {
 	path, err := getConfigPath()
 	if err != nil {
 		return err
@@ -668,9 +725,7 @@ func saveConfig(protected map[string]bool) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return err
 	}
-	var cfg struct {
-		Protected []string `json:"protected"`
-	}
+	cfg := configFile{SwapThreshold: &swapThreshold}
 	for p := range protected {
 		cfg.Protected = append(cfg.Protected, p)
 	}
